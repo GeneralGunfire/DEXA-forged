@@ -333,7 +333,7 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
             <div className="lp__explorerimg">
               <img
                 src="/explorer-preview.png"
-                alt="Preview of the SA Health Explorer: a map of public, private and national health systems and how they connect"
+                alt="The SAHealth explorer: its overview page, with a top navigation bar and a hero image of a South African city"
                 loading="lazy"
               />
             </div>
