@@ -1,22 +1,38 @@
 import { useState, type FormEvent } from 'react'
+import { setRemember, supabase } from '../lib/supabase'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
-  const [remember, setRemember] = useState(false)
+  const [remember, setRememberState] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (busy) return
     setNotice(null)
     setBusy(true)
-    // Supabase email/password sign-in is wired in the next step.
-    window.setTimeout(() => {
+    try {
+      setRemember(remember)
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (error) {
+        setPassword('')
+        setNotice(
+          error.status === 429
+            ? 'Too many attempts. Please wait a few minutes and try again.'
+            : error.status && error.status >= 500
+              ? 'The server had a problem. Please try again.'
+              : 'Incorrect email or password.',
+        )
+      }
+      // On success App.tsx picks up the new session automatically.
+    } catch {
+      setNotice('Could not reach the server. Check your connection and try again.')
+    } finally {
       setBusy(false)
-      setNotice('Sign-in is not connected yet. This is the visual design only.')
-    }, 500)
+    }
   }
 
   return (
@@ -36,7 +52,9 @@ export default function Login() {
               <input
                 type="email"
                 autoComplete="email"
-                placeholder="you@dexa.co.za"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -82,7 +100,7 @@ export default function Login() {
             </div>
 
             <label className="check">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              <input type="checkbox" checked={remember} onChange={(e) => setRememberState(e.target.checked)} />
               <span>Keep me signed in on this device</span>
             </label>
 
@@ -102,7 +120,7 @@ export default function Login() {
       <aside className="login__photo" aria-hidden="true">
         <div className="login__caption">
           <p className="login__kicker">DEXA Forged</p>
-          <p className="login__lead">Where we build South Africa&rsquo;s health data interoperability.</p>
+          <p className="login__lead">The infrastructure behind better health.</p>
         </div>
       </aside>
     </main>
