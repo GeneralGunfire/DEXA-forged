@@ -6,8 +6,8 @@ import { supabase } from '../lib/supabase'
 import { fmtDate, postImageUrl } from '../lib/data'
 import { Dialog, plainExcerpt, Rich } from '../components/ui'
 
-// The SA health explorer is a separate site. Set VITE_EXPLORER_URL to its public address.
-const EXPLORER_URL = (import.meta.env.VITE_EXPLORER_URL as string | undefined) || ''
+// The SAHealth explorer is a separate site. The live address is built in; VITE_EXPLORER_URL can override it.
+const EXPLORER_URL = (import.meta.env.VITE_EXPLORER_URL as string | undefined) || 'https://sa-health-black.vercel.app'
 
 const svg = (d: ReactNode) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
