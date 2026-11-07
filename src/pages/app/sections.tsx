@@ -32,6 +32,16 @@ export const SECTIONS: Section[] = [
     blurb: 'PDF, Word, MP4, JPEG and PNG files, uploaded and named.',
     icon: icon(<><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h6" /></>),
   },
+  {
+    path: 'feedback', label: 'Feedback',
+    blurb: 'What people say about the public explorer: ratings and comments, newest first, with a place to triage each one.',
+    icon: icon(<><path d="M4 5h16v11H9l-5 4V5z" /><path d="M12 8.2l1 2.1 2.2.3-1.6 1.5.4 2.2-2-1.1-2 1.1.4-2.2L8.8 10.6l2.2-.3z" /></>),
+  },
+  {
+    path: 'reports', label: 'Reports',
+    blurb: 'A plain-language summary of progress, database documentation and feedback for any period. Copy it or save it as a PDF.',
+    icon: icon(<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>),
+  },
 ]
 
 export const sectionByPath = (p: string) => SECTIONS.find((s) => s.path === p)!

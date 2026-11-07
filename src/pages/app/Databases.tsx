@@ -3,6 +3,8 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { describe, fmtDate, todayStr, unwrap, useLoad } from '../../lib/data'
 import { Dialog, EmptyState, Field, LoadState, PageHead, Rich } from '../../components/ui'
+import { ScoreRing } from '../../components/viz'
+import { completeness, countBy } from '../../lib/completeness'
 import { DocumentsPanel } from './Documents'
 import { sectionByPath } from './sections'
 import './pages.css'
@@ -22,6 +24,11 @@ export function DatabaseBoard() {
   const { data, error, loading, reload } = useLoad<Db[]>(async () =>
     unwrap<Db[]>(await supabase.from('databases').select('*').order('created_at', { ascending: false })) ?? [])
   const [adding, setAdding] = useState(false)
+  // how many log entries and documents each database has, for the completeness score
+  const counts = useLoad<{ log: Record<string, number>; docs: Record<string, number> }>(async () => {
+    const [e, d] = await Promise.all([supabase.from('db_entries').select('database_id'), supabase.from('documents').select('database_id')])
+    return { log: countBy(unwrap<{ database_id: string }[]>(e) ?? []), docs: countBy(unwrap<{ database_id: string | null }[]>(d) ?? []) }
+  })
 
   return (
     <div className="pg">
@@ -37,7 +44,10 @@ export function DatabaseBoard() {
           <div className="tiles">
             {(data ?? []).map((d) => (
               <Link key={d.id} to={`/app/databases/${d.id}`} className="dbcard">
-                <h3>{d.name}</h3>
+                <div className="dbcard__top">
+                  <h3>{d.name}</h3>
+                  {counts.data && <ScoreRing pct={completeness(d, counts.data.log[d.id] ?? 0, counts.data.docs[d.id] ?? 0).pct} size={42} />}
+                </div>
                 <dl>
                   <div><dt>Machine</dt><dd>{d.machine || '—'}</dd></div>
                   <div><dt>Type</dt><dd>{d.db_type || '—'}</dd></div>
@@ -146,6 +156,8 @@ export function DatabaseDetail() {
             />
             {msg && <p className="notice notice--err" role="alert">{msg}</p>}
 
+            <CompletenessPanel db={data} />
+
             <div className="tabs" role="tablist" aria-label="Database sections">
               {TABS.map((t) => (
                 <button key={t} type="button" role="tab" className="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>
@@ -217,6 +229,33 @@ function ConnectionPanel({ db, onSaved }: { db: Db; onSaved: () => void }) {
         {err && <p className="formerr" role="alert">{err}</p>}
         <button type="submit" className="btn btn--sm" disabled={busy}>{busy ? 'Saving…' : saved ? 'Saved' : 'Save'}</button>
       </form>
+    </section>
+  )
+}
+
+/** How documented this database is, and exactly what is still missing. */
+function CompletenessPanel({ db }: { db: Db }) {
+  const { data } = useLoad<{ log: number; docs: number }>(async () => {
+    const head = { count: 'exact', head: true } as const
+    const [e, d] = await Promise.all([
+      supabase.from('db_entries').select('id', head).eq('database_id', db.id),
+      supabase.from('documents').select('id', head).eq('database_id', db.id),
+    ])
+    return { log: e.count ?? 0, docs: d.count ?? 0 }
+  }, [db.id, db.background, db.shortfalls, db.build_record, db.port, db.instance_name, db.machine, db.db_type])
+  if (!data) return null
+  const c = completeness(db, data.log, data.docs)
+  return (
+    <section className="cpanel" aria-label="Documentation progress">
+      <ScoreRing pct={c.pct} size={64} />
+      <div>
+        <strong>{c.have} of {c.total} documented</strong>
+        {c.missing.length === 0 ? (
+          <p>Everything this card needs is filled in.</p>
+        ) : (
+          <p>Still missing: {c.missing.map((m) => m.label.toLowerCase()).join(', ')}.</p>
+        )}
+      </div>
     </section>
   )
 }

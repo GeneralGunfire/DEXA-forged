@@ -11,6 +11,8 @@ import { DatabaseBoard, DatabaseDetail } from './Databases'
 import Branding from './Branding'
 import Schedule from './Schedule'
 import Documents from './Documents'
+import Feedback from './Feedback'
+import Reports from './Reports'
 import './shell.css'
 
 const homeIcon = (
@@ -36,14 +38,16 @@ function Home({ name }: { name: string }) {
 
   const stats = useLoad<number[]>(async () => {
     const head = { count: 'exact', head: true } as const
-    const [tasks, events, docs, dbs] = await Promise.all([
+    const [tasks, events, docs, dbs, fresh] = await Promise.all([
       supabase.from('tasks').select('id', head).eq('done', false),
       supabase.from('tasks').select('id', head).eq('kind', 'event').eq('done', false).gte('due_date', todayStr()),
       supabase.from('documents').select('id', head),
       supabase.from('databases').select('id', head),
+      supabase.from('feedback').select('id', head).eq('status', 'new'),
     ])
     for (const r of [tasks, events, docs, dbs]) if (r.error) throw r.error
-    return [tasks.count ?? 0, events.count ?? 0, docs.count ?? 0, dbs.count ?? 0]
+    // feedback is optional until feedback.sql has been run, so a missing table counts as zero
+    return [tasks.count ?? 0, events.count ?? 0, docs.count ?? 0, dbs.count ?? 0, fresh.error ? 0 : (fresh.count ?? 0)]
   })
 
   const scrollToNews = () => {
@@ -56,6 +60,7 @@ function Home({ name }: { name: string }) {
     { to: 'schedule', label: 'Upcoming events' },
     { to: 'documents', label: 'Documents' },
     { to: 'databases', label: 'Databases' },
+    { to: 'feedback', label: 'New feedback' },
   ]
 
   return (
@@ -211,6 +216,8 @@ export default function Workspace({ session }: { session: Session }) {
         <Route path="branding" element={<Branding />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="documents" element={<Documents />} />
+        <Route path="feedback" element={<Feedback />} />
+        <Route path="reports" element={<Reports />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>
     </Routes>
