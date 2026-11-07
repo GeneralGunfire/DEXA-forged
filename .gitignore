@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+
+# the parent repo ignores images/video globally; keep the web-app static assets tracked
+!public/*.png
+!public/*.jpg
+!public/*.svg
+
+# large promo media stays out of git (will live in Supabase storage)
+assets/promo/
+*.tsbuildinfo
