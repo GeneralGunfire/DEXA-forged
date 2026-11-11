@@ -9,6 +9,7 @@ import { DbDocuments } from './DbDocuments'
 import { TimelineView } from './Timeline'
 import { ContentSections } from '../../components/ContentSections'
 import { StatTiles } from '../../components/charts'
+import { useCrumb } from '../../components/nav'
 import { sectionByPath } from './sections'
 import './pages.css'
 import { useFeedback } from '../../components/feedback'
@@ -187,6 +188,12 @@ export function DatabaseDetail() {
   const nav = useNavigate()
   const { data, error, loading, reload } = useLoad<Db | null>(async () =>
     unwrap<Db | null>(await supabase.from('databases').select('*').eq('id', id).maybeSingle()), [id])
+  useCrumb(data?.name)
+  const siblings = useLoad<{ id: string; name: string }[]>(async () =>
+    unwrap<{ id: string; name: string }[]>(await supabase.from('databases').select('id, name').order('name')) ?? [])
+  const at = (siblings.data ?? []).findIndex((x) => x.id === id)
+  const prev = at > 0 ? siblings.data![at - 1] : null
+  const next = at >= 0 && siblings.data && at < siblings.data.length - 1 ? siblings.data[at + 1] : null
   const [params, setParams] = useSearchParams()
   const asked = params.get('tab')
   const tab: Tab = (TABS as readonly string[]).includes(asked ?? '') ? (asked as Tab) : 'Timeline'
@@ -213,7 +220,15 @@ export function DatabaseDetail() {
 
   return (
     <div className="pg">
-      <Link to="/app/databases" className="back">← All databases</Link>
+      <div className="recnav">
+        <Link to="/app/databases" className="back">← All databases</Link>
+        {(prev || next) && (
+          <span className="recnav__pn">
+            {prev && <Link to={`/app/databases/${prev.id}`} title={`Previous: ${prev.name}`}>‹ <span>{prev.name}</span></Link>}
+            {next && <Link to={`/app/databases/${next.id}`} title={`Next: ${next.name}`}><span>{next.name}</span> ›</Link>}
+          </span>
+        )}
+      </div>
       <LoadState loading={loading && !data} error={error}>
         {data && (
           <>

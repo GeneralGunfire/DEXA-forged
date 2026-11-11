@@ -10,6 +10,7 @@ import { StatTiles } from '../../components/charts'
 import { sectionByPath } from './sections'
 import './pages.css'
 import { useFeedback } from '../../components/feedback'
+import { useOpenFromQuery } from '../../components/nav'
 
 export type DocRow = {
   id: string; name: string; path: string; mime: string | null; size: number | null
@@ -30,6 +31,7 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
 
   const [q, setQ] = useState('')
   const [uploading, setUploading] = useState(false)
+  useOpenFromQuery('upload', () => { if (!databaseId) setUploading(true) })
   const [renaming, setRenaming] = useState<DocRow | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 

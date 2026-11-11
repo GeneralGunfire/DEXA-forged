@@ -6,6 +6,7 @@ import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components
 import { sectionByPath } from './sections'
 import './pages.css'
 import { useFeedback } from '../../components/feedback'
+import { useOpenFromQuery } from '../../components/nav'
 
 type Task = {
   id: string; title: string; notes: string; kind: 'task' | 'event'; assignee: string | null
@@ -25,6 +26,7 @@ export default function Schedule() {
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [filter, setFilter] = useState<'open' | 'done' | 'all'>('open')
   const [editing, setEditing] = useState<{ task: Task | null; date?: string } | null>(null)
+  useOpenFromQuery('new', () => setEditing({ task: null }))
   const [msg, setMsg] = useState<string | null>(null)
   const now = new Date()
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() })

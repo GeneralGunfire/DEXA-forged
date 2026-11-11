@@ -14,6 +14,7 @@ import { sectionByPath } from './sections'
 import './pages.css'
 import './timeline.css'
 import { useFeedback } from '../../components/feedback'
+import { useOpenFromQuery } from '../../components/nav'
 
 export type DbLite = { id: string; name: string; slug: string | null }
 type DocLink = { id: string; name: string; entry_id: string; database_id: string }
@@ -76,6 +77,7 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
   const [filters, setFilters] = useState<Filters>({ ...NO_FILTERS, database: databaseId ?? '' })
   const [showFilters, setShowFilters] = useState(false)
   const [editing, setEditing] = useState<{ entry?: Entry; preset?: Partial<Entry> } | null>(null)
+  useOpenFromQuery('new', () => setEditing({}))
   const [msg, setMsg] = useState<string | null>(null)
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
   const [activeDay, setActiveDay] = useState('')

@@ -7,6 +7,7 @@ import { Chip, Dialog, EmptyState, Field, LoadState, PageHead, Rich } from '../.
 import { sectionByPath } from './sections'
 import './pages.css'
 import { useFeedback } from '../../components/feedback'
+import { useOpenFromQuery } from '../../components/nav'
 
 export type Post = {
   id: string; title: string; body: string; image_paths: string[]; is_public: boolean
@@ -26,6 +27,7 @@ export default function Messages() {
     unwrap<Post[]>(await supabase.from('posts').select('*').order('posted_at', { ascending: false })) ?? [])
 
   const [editing, setEditing] = useState<Post | 'new' | null>(null)
+  useOpenFromQuery('new', () => setEditing('new'))
   const [msg, setMsg] = useState<string | null>(null)
 
   async function remove(p: Post) {

@@ -9,6 +9,7 @@ import { SECTIONS } from './sections'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
 import { FeedbackProvider } from '../../components/feedback'
 import { WaveBand } from '../../components/charts'
+import { CrumbProvider, TopBar } from '../../components/nav'
 import { CommandPalette } from '../../components/CommandPalette'
 import { Dashboard } from './Dashboard'
 import Messages from './Messages'
@@ -186,6 +187,7 @@ function Layout({ display, email }: { display: string; email: string }) {
 
   return (
     <FeedbackProvider>
+    <CrumbProvider>
     <div className={`ws${rail ? ' ws--rail' : ''}`}>
       <aside className="ws__side">
         <div className="ws__sidein">
@@ -230,10 +232,12 @@ function Layout({ display, email }: { display: string; email: string }) {
       </aside>
 
       <main className="ws__main">
+        <TopBar onSearch={() => setSearching(true)} />
         <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
       <CommandPalette open={searching} onClose={() => setSearching(false)} />
     </div>
+    </CrumbProvider>
     </FeedbackProvider>
   )
 }

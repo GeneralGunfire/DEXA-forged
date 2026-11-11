@@ -44,7 +44,7 @@ export function BarList({ items, max, unit = '', ariaLabel, track }: { items: Ba
 
 /* ---------- one bar split into ordered parts (for example a medicine schedule S0 to S6) ---------- */
 
-const RAMP = ['#0d1f4a', '#1b3a8f', '#2563eb', '#5b8def', '#93b4f5', '#c7d6fb', '#e3ebfd']
+const RAMP = ['#111827', '#374151', '#6b7280', '#9ca3af', '#d1d5db', '#e5e7eb', '#f3f4f6']
 
 export function Stacked({ segments }: { segments: { label: string; value: number }[] }) {
   const parts = segments.filter((s) => s.value > 0)
@@ -144,7 +144,7 @@ const wave = Array.from({ length: 16 }, (_, i) => {
   const amp = 6 + t * 10
   let d = ''
   for (let x = 0; x <= 1200; x += 20) d += `${x === 0 ? 'M' : 'L'}${x} ${(y0 + amp * Math.sin(x / 190 + i * 0.28)).toFixed(1)}`
-  return { d, stroke: `rgb(${lerp(199, 13, t)},${lerp(214, 31, t)},${lerp(251, 74, t)})` }
+  return { d, stroke: `rgb(${lerp(209, 17, t)},${lerp(213, 24, t)},${lerp(219, 39, t)})` }
 })
 
 export function WaveBand({ tone = 'navy', drift = false, className = '' }: { tone?: 'navy' | 'light'; drift?: boolean; className?: string }) {
