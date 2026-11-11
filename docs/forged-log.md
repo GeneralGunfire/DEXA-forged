@@ -45,13 +45,13 @@ The slugs are: nappi, icd10, nrpl, nhls, mfl_dhis2, sanc, hpcsa, cms, hprs, priv
 
 ## Offline queue
 
-If the site cannot be reached (no connection, a server error, a rate limit or a rejected token) the entry is appended to `scripts/forged-log-queue.jsonl` (ignored by git) and the command says it was queued. Send the queue later with:
+If the site cannot be reached (no connection) or answers with a server error (5xx), a rate limit (429) or a refused token (401, including a revoked token), the entry is appended to `scripts/forged-log-queue.jsonl` (ignored by git) and the command says it was queued. **The queue file holds the entry as plain text** (title, summary and detail exactly as typed), because the redaction check runs on the site and has not seen the entry yet. Treat the file as sensitive, keep it out of the repo and chat, and delete it once it has been flushed or is no longer needed. Send the queue later with:
 
 ```
 forged-log --flush
 ```
 
-An entry that the site **rejects** (for example it fails the redaction check, or has an invalid field) is not queued. It is reported and has to be corrected and sent again, so sensitive text is never written to disk.
+Only an entry that the site **rejects** (for example it fails the redaction check, or has an invalid field) is never written to disk. It is reported and has to be corrected and sent again. Entries queued after a 401, 429 or 5xx have not been checked, so write them as carefully as any other entry: counts, errors and descriptions only.
 
 ## What is refused
 
