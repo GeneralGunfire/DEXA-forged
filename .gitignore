@@ -16,3 +16,4 @@ assets/promo/
 # local queue of log entries written while offline
 forged-log-queue.jsonl
 screenshots/
+ad-assets/
