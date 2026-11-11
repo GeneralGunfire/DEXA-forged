@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import { describe, fmtDate, todayStr, unwrap, useLoad, useTeam } from '../../lib/data'
+import { StatTiles } from '../../components/charts'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
 import './pages.css'
@@ -85,6 +86,21 @@ export default function Schedule() {
   return (
     <div className="pg">
       <PageHead title={s.label} blurb={s.blurb} action={<button type="button" className="btn btn--dark" onClick={() => setEditing({ task: null })}>New task or event</button>} />
+
+      {all.length > 0 && (() => {
+        const week = new Date(); week.setDate(week.getDate() + 7)
+        const wk = `${week.getFullYear()}-${String(week.getMonth() + 1).padStart(2, '0')}-${String(week.getDate()).padStart(2, '0')}`
+        const overdue = open.filter((t) => t.due_date && t.due_date < today).length
+        const soon = open.filter((t) => t.due_date && t.due_date >= today && t.due_date <= wk).length
+        return (
+          <StatTiles items={[
+            { value: open.length, label: open.length === 1 ? 'open item' : 'open items' },
+            { value: overdue, label: 'overdue', alert: overdue > 0 },
+            { value: soon, label: 'due in the next 7 days' },
+            { value: all.filter((t) => t.done).length, label: 'done' },
+          ]} />
+        )
+      })()}
 
       {msg && <p className="notice notice--err" role="alert">{msg}</p>}
 

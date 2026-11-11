@@ -3,13 +3,14 @@ import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { ROADMAP } from '../../data/roadmap'
-import { fmtDate, postImageUrl, SETUP, todayStr, unwrap, useLoad } from '../../lib/data'
+import { fmtDate, postImageUrl, SETUP, unwrap, useLoad } from '../../lib/data'
 import { plainExcerpt, SetupNotice } from '../../components/ui'
 import { SECTIONS } from './sections'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
 import { FeedbackProvider } from '../../components/feedback'
 import { WaveBand } from '../../components/charts'
 import { CommandPalette } from '../../components/CommandPalette'
+import { Dashboard } from './Dashboard'
 import Messages from './Messages'
 import { DatabaseBoard, DatabaseDetail } from './Databases'
 import Branding from './Branding'
@@ -42,32 +43,11 @@ function Home({ name }: { name: string }) {
       await supabase.from('posts').select('id, title, body, image_paths, posted_at').order('posted_at', { ascending: false }).limit(3),
     ) ?? [])
 
-  const stats = useLoad<number[]>(async () => {
-    const head = { count: 'exact', head: true } as const
-    const [tasks, events, docs, dbs, fresh] = await Promise.all([
-      supabase.from('tasks').select('id', head).eq('done', false),
-      supabase.from('tasks').select('id', head).eq('kind', 'event').eq('done', false).gte('due_date', todayStr()),
-      supabase.from('documents').select('id', head),
-      supabase.from('databases').select('id', head),
-      supabase.from('feedback').select('id', head).eq('status', 'new'),
-    ])
-    for (const r of [tasks, events, docs, dbs]) if (r.error) throw r.error
-    // feedback is optional until feedback.sql has been run, so a missing table counts as zero
-    return [tasks.count ?? 0, events.count ?? 0, docs.count ?? 0, dbs.count ?? 0, fresh.error ? 0 : (fresh.count ?? 0)]
-  })
-
   const scrollToNews = () => {
     const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
     document.getElementById('news')?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
   }
 
-  const cards = [
-    { to: 'schedule', label: 'Open tasks' },
-    { to: 'schedule', label: 'Upcoming events' },
-    { to: 'documents', label: 'Documents' },
-    { to: 'databases', label: 'Databases' },
-    { to: 'feedback', label: 'New feedback' },
-  ]
 
   return (
     <>
@@ -89,6 +69,7 @@ function Home({ name }: { name: string }) {
       </section>
 
       <div className="wd">
+        <Dashboard name={name} />
         <section id="news" className="wd__sec" aria-labelledby="news-title">
           <header className="wd__head">
             <div>
@@ -122,22 +103,6 @@ function Home({ name }: { name: string }) {
           )}
         </section>
 
-        <section className="wd__sec" aria-labelledby="glance-title">
-          <header className="wd__head">
-            <div>
-              <p className="wd__eyebrow">Overview</p>
-              <h2 id="glance-title">At a glance</h2>
-            </div>
-          </header>
-          <div className="wd__stats">
-            {cards.map((c, i) => (
-              <Link key={c.label} to={`/app/${c.to}`} className="wd__stat">
-                <strong>{stats.data ? stats.data[i] : '–'}</strong>
-                <span>{c.label}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
 
         <section className="wd__sec" aria-labelledby="build-title">
           <header className="wd__head">

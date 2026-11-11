@@ -6,6 +6,7 @@ import {
 } from '../../lib/data'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { DocViewer } from '../../components/DocViewer'
+import { StatTiles } from '../../components/charts'
 import { sectionByPath } from './sections'
 import './pages.css'
 import { useFeedback } from '../../components/feedback'
@@ -53,6 +54,21 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
 
   return (
     <>
+      {!databaseId && (data ?? []).length > 0 && (() => {
+        const all = data ?? []
+        const bytes = all.reduce((t, d) => t + (d.size ?? 0), 0)
+        const weekAgo = Date.now() - 7 * 86400000
+        const kinds = new Set(all.map((d) => fileKind(d.mime, d.name)))
+        return (
+          <StatTiles items={[
+            { value: all.length, label: all.length === 1 ? 'document' : 'documents' },
+            { value: fmtBytes(bytes) || '0 B', label: 'stored in total' },
+            { value: all.filter((d) => new Date(d.created_at).getTime() >= weekAgo).length, label: 'added this week' },
+            { value: kinds.size, label: kinds.size === 1 ? 'file type' : 'file types', hint: [...kinds].join(', ') },
+          ]} />
+        )
+      })()}
+
       <div className="bar">
         <input className="search" type="search" placeholder="Search documents" aria-label="Search documents" value={q} onChange={(e) => setQ(e.target.value)} />
         <button type="button" className="btn btn--dark" onClick={() => setUploading(true)}>Upload files</button>
