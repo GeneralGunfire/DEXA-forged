@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { todayStr, unwrap, useLoad, useTeam } from '../../lib/data'
 import { completeness, countBy } from '../../lib/completeness'
 import { LoadState, PageHead } from '../../components/ui'
-import { Bar, ScoreRing, Stars } from '../../components/viz'
+import { Bar, Stars } from '../../components/viz'
+import { BarList, Columns, StatTiles, Takeaways } from '../../components/charts'
 import { average } from './Feedback'
 import { sectionByPath } from './sections'
 import './pages.css'
@@ -30,17 +31,22 @@ export default function Reports() {
   const [copied, setCopied] = useState(false)
 
   const { data, error, loading } = useLoad<Raw>(async () => {
-    const [tasks, dbs, entries, docs, posts, fb] = await Promise.all([
+    const [tasks, dbs, entries, docs, posts, fb, tl, dd] = await Promise.all([
       supabase.from('tasks').select('id,title,kind,assignee,due_date,done,created_at'),
       supabase.from('databases').select('id,name,machine,db_type,background,shortfalls,port,instance_name,build_record'),
       supabase.from('db_entries').select('database_id,entry_date'),
       supabase.from('documents').select('database_id,created_at'),
       supabase.from('posts').select('posted_at'),
       supabase.from('feedback').select('rating,page,status,message,created_at'),
+      supabase.from('timeline_entries').select('database_id,happened_at'),
+      supabase.from('db_documents').select('database_id,created_at'),
     ])
+    // timeline entries count as development log entries and dated documents as documents; a table that is not set up yet counts as none
+    const tlRows = tl.error ? [] : ((tl.data ?? []) as { database_id: string | null; happened_at: string }[]).map((x) => ({ database_id: x.database_id, entry_date: x.happened_at.slice(0, 10) }))
+    const ddRows = dd.error ? [] : ((dd.data ?? []) as { database_id: string | null; created_at: string }[])
     return {
-      tasks: unwrap<Task[]>(tasks) ?? [], dbs: unwrap<Db[]>(dbs) ?? [], entries: unwrap<Raw['entries']>(entries) ?? [],
-      docs: unwrap<Raw['docs']>(docs) ?? [], posts: unwrap<Raw['posts']>(posts) ?? [],
+      tasks: unwrap<Task[]>(tasks) ?? [], dbs: unwrap<Db[]>(dbs) ?? [], entries: [...(unwrap<Raw['entries']>(entries) ?? []), ...tlRows] as Raw['entries'],
+      docs: [...(unwrap<Raw['docs']>(docs) ?? []), ...ddRows] as Raw['docs'], posts: unwrap<Raw['posts']>(posts) ?? [],
       // feedback is optional until feedback.sql has been run: a missing table just means none yet
       fb: fb.error ? [] : (unwrap<Fb[]>(fb) ?? []),
     }
@@ -103,7 +109,23 @@ export default function Reports() {
     if (newFb) insights.push(`${newFb} feedback item${newFb === 1 ? ' has' : 's have'} not been read yet.`)
     if (!insights.length) insights.push('Nothing to report yet. Add tasks, databases or feedback and this fills in by itself.')
 
-    return { scores, avgScore, open, overdue, done, byPerson, fb, fbAvg, dist, topPages, posts, logs, uploads, newFb, insights, logCount, docCount }
+    // log entries per week for the last 12 weeks (week starts on Monday)
+    const weekStart = (iso: string) => {
+      const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso)
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+      return todayKey(d)
+    }
+    const todayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const byWeek: Record<string, number> = {}
+    for (const e of data.entries) { const k = weekStart(e.entry_date); byWeek[k] = (byWeek[k] ?? 0) + 1 }
+    const weeks: { key: string; label: string; value: number }[] = []
+    const cur = new Date(weekStart(todayStr()) + 'T00:00:00')
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(cur); d.setDate(d.getDate() - i * 7)
+      const k = todayKey(d)
+      weeks.push({ key: k, label: d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }), value: byWeek[k] ?? 0 })
+    }
+    return { weeks: weeks.some((w) => w.value > 0) ? weeks : [], scores, avgScore, open, overdue, done, byPerson, fb, fbAvg, dist, topPages, posts, logs, uploads, newFb, insights, logCount, docCount }
   }, [data, period])
 
   const label = PERIODS.find((p) => p.v === period)!.label
@@ -143,18 +165,22 @@ export default function Reports() {
           <>
             <h2 className="print-title">DEXA Forged report: {label}</h2>
 
-            <section className="rsec">
-              <h3>Highlights</h3>
-              <ul className="insights">{r.insights.map((i) => <li key={i}>{i}</li>)}</ul>
-            </section>
+            <Takeaways title="Highlights" items={r.insights} />
 
-            <div className="rtiles">
-              <div><strong>{r.posts}</strong><span>posts</span></div>
-              <div><strong>{r.logs}</strong><span>log entries</span></div>
-              <div><strong>{r.uploads}</strong><span>uploads</span></div>
-              <div><strong>{r.fb.length}</strong><span>feedback</span></div>
-              <div><strong>{r.done.length}<small>/{r.done.length + r.open.length}</small></strong><span>tasks done</span></div>
-            </div>
+            <StatTiles items={[
+              { value: r.posts, label: 'posts' },
+              { value: r.logs.toLocaleString('en-ZA'), label: 'log entries' },
+              { value: r.uploads, label: 'uploads' },
+              { value: r.fb.length, label: 'feedback' },
+              { value: `${r.done.length}/${r.done.length + r.open.length}`, label: 'tasks done', alert: r.overdue.length > 0, hint: r.overdue.length ? `${r.overdue.length} overdue` : undefined },
+            ]} />
+
+            {r.weeks.length > 1 && (
+              <section className="rsec">
+                <div className="rsec__head"><h3>Activity by week</h3><span className="muted">Log entries, newest on the right</span></div>
+                <Columns data={r.weeks} ariaLabel="Log entries per week" height={96} />
+              </section>
+            )}
 
             <section className="rsec">
               <div className="rsec__head">
@@ -162,17 +188,15 @@ export default function Reports() {
                 <span className="muted">Average {r.avgScore}%. <Link to="/app/databases">Open the board</Link></span>
               </div>
               {r.scores.length === 0 ? <p className="muted">No databases yet.</p> : (
-                <ul className="dbscores">
-                  {r.scores.map(({ d, c }) => (
-                    <li key={d.id}>
-                      <ScoreRing pct={c.pct} size={44} />
-                      <div>
-                        <Link to={`/app/databases/${d.id}`}><b>{d.name}</b></Link>
-                        <small>{c.missing.length ? `Missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}` : 'Fully documented'}</small>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <BarList
+                  ariaLabel="Documentation progress by database"
+                  max={100}
+                  track
+                  items={r.scores.map(({ d, c }) => ({
+                    label: d.name, to: `/app/databases/${d.id}`, value: c.pct, text: `${c.pct}%`,
+                    note: c.missing.length ? `Missing ${c.missing.slice(0, 3).map((m) => m.label.toLowerCase().replace(/\s*\(.*\)/, '')).join(', ')}${c.missing.length > 3 ? ` and ${c.missing.length - 3} more` : ''}` : 'Fully documented',
+                  }))}
+                />
               )}
             </section>
 

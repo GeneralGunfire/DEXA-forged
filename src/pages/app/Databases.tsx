@@ -1,17 +1,23 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { describe, fmtDate, todayStr, unwrap, useLoad } from '../../lib/data'
 import { Dialog, EmptyState, Field, LoadState, PageHead, Rich } from '../../components/ui'
-import { ScoreRing } from '../../components/viz'
 import { completeness, countBy } from '../../lib/completeness'
 import { DocumentsPanel } from './Documents'
+import { DbDocuments } from './DbDocuments'
+import { TimelineView } from './Timeline'
+import { ContentSections } from '../../components/ContentSections'
+import { StatTiles } from '../../components/charts'
+import { useCrumb } from '../../components/nav'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
 
 type Db = {
   id: string; name: string; machine: string; db_type: string; port: string; instance_name: string
   background: string; shortfalls: string; build_record: string; created_at: string
+  slug: string | null; status: string
 }
 
 const MACHINES = ["Rajen's PC", "Huzayfa's laptop"]
@@ -25,15 +31,52 @@ export function DatabaseBoard() {
     unwrap<Db[]>(await supabase.from('databases').select('*').order('created_at', { ascending: false })) ?? [])
   const [adding, setAdding] = useState(false)
   // how many log entries and documents each database has, for the completeness score
-  const counts = useLoad<{ log: Record<string, number>; docs: Record<string, number> }>(async () => {
-    const [e, d] = await Promise.all([supabase.from('db_entries').select('database_id'), supabase.from('documents').select('database_id')])
-    return { log: countBy(unwrap<{ database_id: string }[]>(e) ?? []), docs: countBy(unwrap<{ database_id: string | null }[]>(d) ?? []) }
+  const counts = useLoad<{ log: Record<string, number>; docs: Record<string, number>; tl: Record<string, { n: number; open: number; last: string }> }>(async () => {
+    const [e, d, t, dd] = await Promise.all([
+      supabase.from('db_entries').select('database_id'), supabase.from('documents').select('database_id'),
+      supabase.from('timeline_entries').select('database_id, type, status, happened_at'), supabase.from('db_documents').select('database_id'),
+    ])
+    const sum = (a: Record<string, number>, b: Record<string, number>) => {
+      const o = { ...a }
+      for (const k of Object.keys(b)) o[k] = (o[k] ?? 0) + b[k]
+      return o
+    }
+    // the newer tables may not exist yet on an older database, so a missing table counts as nothing
+    const rows = (r: { data: unknown; error: unknown }) => (r.error ? [] : ((r.data as { database_id: string | null }[]) ?? []))
+    const tl: Record<string, { n: number; open: number; last: string }> = {}
+    if (!t.error) {
+      for (const x of (t.data ?? []) as { database_id: string | null; type: string; status: string | null; happened_at: string }[]) {
+        if (!x.database_id) continue
+        const c = (tl[x.database_id] ??= { n: 0, open: 0, last: '' })
+        c.n++
+        if (x.type === 'Error' && x.status === 'Open') c.open++
+        if (x.happened_at > c.last) c.last = x.happened_at
+      }
+    }
+    return {
+      tl,
+      log: sum(countBy(unwrap<{ database_id: string }[]>(e) ?? []), countBy(rows(t))),
+      docs: sum(countBy(unwrap<{ database_id: string | null }[]>(d) ?? []), countBy(rows(dd))),
+    }
   })
 
   return (
     <div className="pg">
       <PageHead title={s.label} blurb={s.blurb} action={<button type="button" className="btn btn--dark" onClick={() => setAdding(true)}>New database</button>} />
       <LoadState loading={loading && !data} error={error}>
+        {data && data.length > 0 && counts.data && (() => {
+          const tl = Object.values(counts.data.tl)
+          const avg = Math.round(data.reduce((t, d) => t + completeness(d, counts.data!.log[d.id] ?? 0, counts.data!.docs[d.id] ?? 0).pct, 0) / data.length)
+          const open = tl.reduce((t, x) => t + x.open, 0)
+          return (
+            <StatTiles items={[
+              { value: data.length, label: 'databases', hint: `${data.filter((d) => d.machine === MACHINES[0]).length} on Machine A` },
+              { value: `${avg}%`, label: 'documented on average' },
+              { value: tl.reduce((t, x) => t + x.n, 0).toLocaleString('en-ZA'), label: 'timeline entries' },
+              { value: open, label: open === 1 ? 'open error' : 'open errors', alert: open > 0 },
+            ]} />
+          )
+        })()}
         {data && data.length === 0 ? (
           <EmptyState
             title="No databases added yet."
@@ -41,20 +84,46 @@ export function DatabaseBoard() {
             action={<button type="button" className="btn btn--dark" onClick={() => setAdding(true)}>New database</button>}
           />
         ) : (
-          <div className="tiles">
-            {(data ?? []).map((d) => (
-              <Link key={d.id} to={`/app/databases/${d.id}`} className="dbcard">
-                <div className="dbcard__top">
-                  <h3>{d.name}</h3>
-                  {counts.data && <ScoreRing pct={completeness(d, counts.data.log[d.id] ?? 0, counts.data.docs[d.id] ?? 0).pct} size={42} />}
+          <>
+            {[
+              { label: "Machine A: Rajen's PC", list: (data ?? []).filter((d) => d.machine === MACHINES[0]) },
+              { label: "Machine B: Huzayfa's laptop", list: (data ?? []).filter((d) => d.machine === MACHINES[1]) },
+              { label: 'Other', list: (data ?? []).filter((d) => d.machine !== MACHINES[0] && d.machine !== MACHINES[1]) },
+            ].filter((g) => g.list.length > 0).map((g) => (
+              <section key={g.label} className="dbgroup" aria-label={g.label}>
+                <h2 className="dbgroup__h">{g.label} <span>{g.list.length}</span></h2>
+                <div className="dbgrid">
+                  {[...g.list].sort((x, y) => x.name.localeCompare(y.name)).map((d) => {
+                    const pct = counts.data ? completeness(d, counts.data.log[d.id] ?? 0, counts.data.docs[d.id] ?? 0).pct : null
+                    const st = counts.data?.tl[d.id]
+                    return (
+                      <Link key={d.id} to={`/app/databases/${d.id}`} className="dbcard2">
+                        <span className="dbcard2__top">
+                          <span className="dbcard2__ic" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" /><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></svg>
+                          </span>
+                          <svg className="dbcard2__go" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" /></svg>
+                        </span>
+                        <h3>{d.name}</h3>
+                        <span className="dbcard2__chips">
+                          {d.db_type && <span className="chip2">{d.db_type}</span>}
+                          {d.status && <span className={`chip2 chip2--${/complete|verified/i.test(d.status) && !/awaiting/i.test(d.status) ? 'good' : 'wait'}`}><i aria-hidden="true" />{d.status}</span>}
+                        </span>
+                        <span className="dbcard2__foot">
+                          <span>
+                            {st ? `${st.n} ${st.n === 1 ? 'entry' : 'entries'}` : 'No entries'}
+                            {st && st.open > 0 && <b className="dbcard2__open"> · {st.open} open {st.open === 1 ? 'error' : 'errors'}</b>}
+                          </span>
+                          {pct !== null && <b>{pct}%</b>}
+                        </span>
+                        {pct !== null && <span className="dbcard2__bar" role="img" aria-label={`${pct}% documented`}><i style={{ width: `${pct}%` }} /></span>}
+                      </Link>
+                    )
+                  })}
                 </div>
-                <dl>
-                  <div><dt>Machine</dt><dd>{d.machine || '—'}</dd></div>
-                  <div><dt>Type</dt><dd>{d.db_type || '—'}</dd></div>
-                </dl>
-              </Link>
+              </section>
             ))}
-          </div>
+          </>
         )}
       </LoadState>
       <Dialog open={adding} onClose={() => setAdding(false)} title="New database">
@@ -73,7 +142,7 @@ function DbForm({ db, onClose, onDone }: { db?: Db; onClose: () => void; onDone:
     const fd = new FormData(e.currentTarget)
     const name = String(fd.get('name') ?? '').trim()
     if (!name) return setErr('Give the database a name.')
-    const row = { name, machine: String(fd.get('machine') ?? '').trim(), db_type: String(fd.get('type') ?? '').trim() }
+    const row = { name, machine: String(fd.get('machine') ?? '').trim(), db_type: String(fd.get('type') ?? '').trim(), status: String(fd.get('status') ?? '').trim() }
     setBusy(true)
     try {
       if (db) unwrap(await supabase.from('databases').update(row).eq('id', db.id))
@@ -98,6 +167,7 @@ function DbForm({ db, onClose, onDone }: { db?: Db; onClose: () => void; onDone:
           <datalist id="dbtypes">{TYPES.map((t) => <option key={t} value={t} />)}</datalist>
         </Field>
       </div>
+      <Field label="Status" hint="Free text, for example Phase 1 complete."><input type="text" name="status" maxLength={80} defaultValue={db?.status ?? ''} /></Field>
       {err && <p className="formerr" role="alert">{err}</p>}
       <div className="dlg__foot">
         <button type="button" className="btn" onClick={onClose}>Cancel</button>
@@ -109,20 +179,30 @@ function DbForm({ db, onClose, onDone }: { db?: Db; onClose: () => void; onDone:
 
 /* ---------------- detail ---------------- */
 
-const TABS = ['Background', 'Build record', 'Development log', 'Documents'] as const
+const TABS = ['Timeline', 'Documents', 'Background', 'Build record', 'Development log'] as const
 type Tab = (typeof TABS)[number]
 
 export function DatabaseDetail() {
+  const { confirm } = useFeedback()
   const { id = '' } = useParams()
   const nav = useNavigate()
   const { data, error, loading, reload } = useLoad<Db | null>(async () =>
     unwrap<Db | null>(await supabase.from('databases').select('*').eq('id', id).maybeSingle()), [id])
-  const [tab, setTab] = useState<Tab>('Background')
+  useCrumb(data?.name)
+  const siblings = useLoad<{ id: string; name: string }[]>(async () =>
+    unwrap<{ id: string; name: string }[]>(await supabase.from('databases').select('id, name').order('name')) ?? [])
+  const at = (siblings.data ?? []).findIndex((x) => x.id === id)
+  const prev = at > 0 ? siblings.data![at - 1] : null
+  const next = at >= 0 && siblings.data && at < siblings.data.length - 1 ? siblings.data[at + 1] : null
+  const [params, setParams] = useSearchParams()
+  const asked = params.get('tab')
+  const tab: Tab = (TABS as readonly string[]).includes(asked ?? '') ? (asked as Tab) : 'Timeline'
+  const setTab = (t: Tab) => setParams((p) => { p.set('tab', t); p.delete('entry'); p.delete('doc'); return p }, { replace: true })
   const [editing, setEditing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   async function remove(d: Db) {
-    if (!window.confirm(`Delete "${d.name}" and all of its log entries and documents? This cannot be undone.`)) return
+    if (!await confirm(`Delete "${d.name}" and all of its log entries and documents? This cannot be undone.`)) return
     try {
       const docs = unwrap<{ path: string }[]>(await supabase.from('documents').select('path').eq('database_id', d.id)) ?? []
       unwrap(await supabase.from('databases').delete().eq('id', d.id))
@@ -140,13 +220,21 @@ export function DatabaseDetail() {
 
   return (
     <div className="pg">
-      <Link to="/app/databases" className="back">← All databases</Link>
+      <div className="recnav">
+        <Link to="/app/databases" className="back">← All databases</Link>
+        {(prev || next) && (
+          <span className="recnav__pn">
+            {prev && <Link to={`/app/databases/${prev.id}`} title={`Previous: ${prev.name}`}>‹ <span>{prev.name}</span></Link>}
+            {next && <Link to={`/app/databases/${next.id}`} title={`Next: ${next.name}`}><span>{next.name}</span> ›</Link>}
+          </span>
+        )}
+      </div>
       <LoadState loading={loading && !data} error={error}>
         {data && (
           <>
             <PageHead
               title={data.name}
-              blurb={[data.machine, data.db_type].filter(Boolean).join(' · ') || 'No machine or type set yet.'}
+              blurb={[data.machine, data.db_type, data.status].filter(Boolean).join(' · ') || 'No machine or type set yet.'}
               action={
                 <>
                   <button type="button" className="btn" onClick={() => setEditing(true)}>Edit details</button>
@@ -176,6 +264,7 @@ export function DatabaseDetail() {
                   empty="The real-world shortfalls of this system: what it gets wrong, misses or cannot do."
                   onSave={(t) => saveField('shortfalls', t)}
                 />
+                <ContentSections databaseId={data.id} area="background" />
               </>
             )}
             {tab === 'Build record' && (
@@ -186,10 +275,17 @@ export function DatabaseDetail() {
                   empty="Tables, how it was populated, versions and anything else needed to rebuild it."
                   onSave={(t) => saveField('build_record', t)} rows={14}
                 />
+                <ContentSections databaseId={data.id} area="build" />
               </>
             )}
             {tab === 'Development log' && <LogPanel databaseId={data.id} />}
-            {tab === 'Documents' && <DocumentsPanel databaseId={data.id} />}
+            {tab === 'Timeline' && <TimelineView databaseId={data.id} />}
+            {tab === 'Documents' && (
+              <>
+                <DbDocuments databaseId={data.id} />
+                <LegacyDocuments databaseId={data.id} />
+              </>
+            )}
 
             <Dialog open={editing} onClose={() => setEditing(false)} title="Edit details">
               {editing && <DbForm db={data} onClose={() => setEditing(false)} onDone={reload} />}
@@ -235,28 +331,41 @@ function ConnectionPanel({ db, onSaved }: { db: Db; onSaved: () => void }) {
 
 /** How documented this database is, and exactly what is still missing. */
 function CompletenessPanel({ db }: { db: Db }) {
-  const { data } = useLoad<{ log: number; docs: number }>(async () => {
+  const { data } = useLoad<{ log: number; docs: number; n: number; open: number; resolved: number; last: string }>(async () => {
     const head = { count: 'exact', head: true } as const
-    const [e, d] = await Promise.all([
+    const [e, d, t, dd] = await Promise.all([
       supabase.from('db_entries').select('id', head).eq('database_id', db.id),
       supabase.from('documents').select('id', head).eq('database_id', db.id),
+      supabase.from('timeline_entries').select('type, status, happened_at').eq('database_id', db.id),
+      supabase.from('db_documents').select('id', head).eq('database_id', db.id).eq('is_current', true),
     ])
-    return { log: e.count ?? 0, docs: d.count ?? 0 }
+    const rows = (t.error ? [] : (t.data ?? [])) as { type: string; status: string | null; happened_at: string }[]
+    // dated documents and timeline entries count too; a table that does not exist yet counts as nothing
+    return {
+      log: (e.count ?? 0) + rows.length, docs: (d.count ?? 0) + (dd.error ? 0 : dd.count ?? 0),
+      n: rows.length, open: rows.filter((x) => x.type === 'Error' && x.status === 'Open').length,
+      resolved: rows.filter((x) => x.type === 'Error' && x.status === 'Resolved').length,
+      last: rows.reduce((m, x) => (x.happened_at > m ? x.happened_at : m), ''),
+    }
   }, [db.id, db.background, db.shortfalls, db.build_record, db.port, db.instance_name, db.machine, db.db_type])
   if (!data) return null
   const c = completeness(db, data.log, data.docs)
   return (
-    <section className="cpanel" aria-label="Documentation progress">
-      <ScoreRing pct={c.pct} size={64} />
-      <div>
-        <strong>{c.have} of {c.total} documented</strong>
-        {c.missing.length === 0 ? (
-          <p>Everything this card needs is filled in.</p>
-        ) : (
-          <p>Still missing: {c.missing.map((m) => m.label.toLowerCase()).join(', ')}.</p>
-        )}
-      </div>
-    </section>
+    <>
+      <section className="cbar" aria-label="Documentation progress">
+        <div className="cbar__row">
+          <strong>{c.have} of {c.total} parts documented</strong>
+          <div className="cbar__track" role="img" aria-label={`${c.pct}% documented`}><i style={{ width: `${c.pct}%` }} /></div>
+        </div>
+        <p>{c.missing.length === 0 ? 'Everything this record needs is filled in.' : `Still missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}.`}</p>
+      </section>
+      <StatTiles items={[
+        { value: data.n.toLocaleString('en-ZA'), label: data.n === 1 ? 'timeline entry' : 'timeline entries', hint: data.last ? `last ${fmtDate(data.last)}` : undefined },
+        { value: data.open, label: data.open === 1 ? 'open error' : 'open errors', alert: data.open > 0, hint: data.resolved ? `${data.resolved} resolved` : undefined },
+        { value: data.docs, label: data.docs === 1 ? 'document' : 'documents' },
+        { value: `${c.pct}%`, label: 'documented' },
+      ]} />
+    </>
   )
 }
 
@@ -299,31 +408,55 @@ function EditableText({
 /* ---------------- development log ---------------- */
 
 type Entry = { id: string; database_id: string; title: string; body: string; entry_date: string }
+type TlItem = { id: string; type: string; author: string; title: string; summary: string; happened_at: string; status: string | null }
 
 function LogPanel({ databaseId }: { databaseId: string }) {
+  const { confirm } = useFeedback()
   const { data, error, loading, reload } = useLoad<Entry[]>(async () =>
     unwrap<Entry[]>(await supabase.from('db_entries').select('*').eq('database_id', databaseId)
       .order('entry_date', { ascending: false }).order('created_at', { ascending: false })) ?? [], [databaseId])
+  // what Claude Code (and the team) logged on the timeline for this database also shows here
+  const tl = useLoad<TlItem[]>(async () =>
+    unwrap<TlItem[]>(await supabase.from('timeline_entries').select('id, type, author, title, summary, happened_at, status')
+      .eq('database_id', databaseId).order('happened_at', { ascending: false }).limit(500)) ?? [], [databaseId])
   const [editing, setEditing] = useState<Entry | 'new' | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
+  const merged = [
+    ...(data ?? []).map((en) => ({ at: en.entry_date, en, t: null as TlItem | null })),
+    ...(tl.data ?? []).map((t) => ({ at: t.happened_at, en: null as Entry | null, t })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
+
   async function remove(en: Entry) {
-    if (!window.confirm(`Delete "${en.title}"?`)) return
+    if (!await confirm(`Delete "${en.title}"?`)) return
     try { unwrap(await supabase.from('db_entries').delete().eq('id', en.id)); reload() } catch (e) { setMsg(describe(e)) }
   }
 
   return (
     <>
       <div className="bar">
-        <span className="muted">Ongoing progress, newest first.</span>
+        <span className="muted">Ongoing progress, newest first. Entries Claude Code logs on the timeline appear here too.</span>
         <button type="button" className="btn btn--dark" onClick={() => setEditing('new')}>Add entry</button>
       </div>
       {msg && <p className="notice notice--err" role="alert">{msg}</p>}
-      <LoadState loading={loading && !data} error={error}>
-        {data && data.length === 0 ? (
-          <EmptyState title="No log entries yet." text="Record progress as you build and change this database." />
+      <LoadState loading={(loading && !data) || (tl.loading && !tl.data)} error={error}>
+        {merged.length === 0 ? (
+          <EmptyState title="No log entries yet." text="Claude Code adds entries as it works. You can also write one by hand." />
         ) : (
-          (data ?? []).map((en) => (
+          merged.map(({ en, t }) => t ? (
+            <article className="post" key={`t${t.id}`}>
+              <div className="post__top">
+                <h2 style={{ fontSize: 16 }}>{t.title}</h2>
+                <Link className="btn btn--sm" to={`/app/databases/${databaseId}?tab=Timeline&entry=${t.id}`}>Open on timeline</Link>
+              </div>
+              <div className="post__meta">
+                <span>{fmtDate(t.happened_at)}</span>
+                <span className={`chip${t.author === 'Claude Code' ? ' chip--on' : ''}`}>{t.author}</span>
+                <span className="chip">{t.type}{t.status ? `, ${t.status}` : ''}</span>
+              </div>
+              {t.summary && <p className="rich">{t.summary}</p>}
+            </article>
+          ) : en && (
             <article className="post" key={en.id}>
               <div className="post__top">
                 <h2 style={{ fontSize: 16 }}>{en.title}</h2>
@@ -385,3 +518,18 @@ function EntryForm({ databaseId, entry, onClose, onDone }: { databaseId: string;
   )
 }
 
+
+/** Files uploaded before documents were dated: still shown, only if there are any. */
+function LegacyDocuments({ databaseId }: { databaseId: string }) {
+  const { data } = useLoad<number>(async () => {
+    const r = await supabase.from('documents').select('id', { count: 'exact', head: true }).eq('database_id', databaseId)
+    return r.count ?? 0
+  }, [databaseId])
+  if (!data) return null
+  return (
+    <section style={{ marginTop: 28 }}>
+      <h3 className="group-title">Earlier uploads</h3>
+      <DocumentsPanel databaseId={databaseId} />
+    </section>
+  )
+}

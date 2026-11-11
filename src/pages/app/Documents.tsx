@@ -5,8 +5,12 @@ import {
   unwrap, uploadFile, useLoad, useTeam,
 } from '../../lib/data'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
+import { DocViewer } from '../../components/DocViewer'
+import { StatTiles } from '../../components/charts'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
+import { useOpenFromQuery } from '../../components/nav'
 
 export type DocRow = {
   id: string; name: string; path: string; mime: string | null; size: number | null
@@ -17,6 +21,7 @@ const stripExt = (n: string) => n.replace(/\.[^.]+$/, '')
 
 /** Used by the Documents page (databaseId = null) and by each database's Documents tab. */
 export function DocumentsPanel({ databaseId = null }: { databaseId?: string | null }) {
+  const { confirm } = useFeedback()
   const { name: who } = useTeam()
   const { data, error, loading, reload } = useLoad<DocRow[]>(async () => {
     let q = supabase.from('documents').select('*').order('created_at', { ascending: false })
@@ -26,19 +31,22 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
 
   const [q, setQ] = useState('')
   const [uploading, setUploading] = useState(false)
+  useOpenFromQuery('upload', () => { if (!databaseId) setUploading(true) })
   const [renaming, setRenaming] = useState<DocRow | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
   const rows = (data ?? []).filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()))
 
+  const [viewing, setViewing] = useState<DocRow | null>(null)
   async function open(d: DocRow) {
+    if (['PDF', 'Image'].includes(fileKind(d.mime, d.name))) return setViewing(d)
     try { window.open(await signedUrl(d.path), '_blank', 'noopener') } catch (e) { setMsg(describe(e)) }
   }
   async function download(d: DocRow) {
     try { await downloadFile(d.path, d.name) } catch (e) { setMsg(describe(e)) }
   }
   async function remove(d: DocRow) {
-    if (!window.confirm(`Delete "${d.name}"? This cannot be undone.`)) return
+    if (!await confirm(`Delete "${d.name}"? This cannot be undone.`)) return
     try {
       unwrap(await supabase.from('documents').delete().eq('id', d.id))
       await removeFiles([d.path])
@@ -48,6 +56,21 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
 
   return (
     <>
+      {!databaseId && (data ?? []).length > 0 && (() => {
+        const all = data ?? []
+        const bytes = all.reduce((t, d) => t + (d.size ?? 0), 0)
+        const weekAgo = Date.now() - 7 * 86400000
+        const kinds = new Set(all.map((d) => fileKind(d.mime, d.name)))
+        return (
+          <StatTiles items={[
+            { value: all.length, label: all.length === 1 ? 'document' : 'documents' },
+            { value: fmtBytes(bytes) || '0 B', label: 'stored in total' },
+            { value: all.filter((d) => new Date(d.created_at).getTime() >= weekAgo).length, label: 'added this week' },
+            { value: kinds.size, label: kinds.size === 1 ? 'file type' : 'file types', hint: [...kinds].join(', ') },
+          ]} />
+        )
+      })()}
+
       <div className="bar">
         <input className="search" type="search" placeholder="Search documents" aria-label="Search documents" value={q} onChange={(e) => setQ(e.target.value)} />
         <button type="button" className="btn btn--dark" onClick={() => setUploading(true)}>Upload files</button>
@@ -84,6 +107,7 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
         )}
       </LoadState>
 
+      <DocViewer doc={viewing ? { name: viewing.name, path: viewing.path, mime: viewing.mime } : null} onClose={() => setViewing(null)} />
       <UploadDialog open={uploading} onClose={() => setUploading(false)} databaseId={databaseId} onDone={reload} />
       <RenameDialog doc={renaming} onClose={() => setRenaming(null)} onDone={reload} />
     </>

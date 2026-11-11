@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+/**
+ * forged-content: write one in-depth section (Background or Build record) to a Forged record.
+ * No dependencies (Node 18+). The endpoint and token come ONLY from the environment
+ * (FORGED_CONTENT_URL, FORGED_CONTENT_TOKEN) and are never printed. Prints the section id on success.
+ * Writing the same db + area + title again replaces that section.
+ */
+import fs from 'node:fs'
+
+const USAGE = `Usage:
+  forged-content --db public_hospital --area build --title "Tables" --summary "Plain words" --body-file tables.md
+  forged-content --db public_hospital --area build --title "All tables" --kind table --csv-file tables.csv
+  forged-content --area estate --title "Port registry" --body-file ports.md
+
+Options: --db <slug>        database slug (omit, or "estate", for the whole-estate area)
+         --area background|build|estate
+         --title <text>     section title (with db and area, identifies the section)
+         --summary <text>   one or two plain-word sentences shown while the section is closed
+         --kind text|table|queries|sources|chart   (default text)
+         --body <text> | --body-file <file>     markdown-style text, or the query text for kind queries
+         --chart-file <file> a JSON chart (bar, stacked or before-after); see docs/forged-content.md
+         --csv-file <file>  a CSV with a header row; sent as a table (kind table)
+         --position <n>     order on the page, lowest first (default 100)
+         --open             show the section expanded (default collapsed)
+Environment: FORGED_CONTENT_URL, FORGED_CONTENT_TOKEN`
+
+const fail = (m, code = 1) => { process.stderr.write(m + '\n'); process.exit(code) }
+
+function csv(text) {
+  const rows = []
+  let row = [], cell = '', q = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++ } else if (c === '"') q = false; else cell += c
+    } else if (c === '"') q = true
+    else if (c === ',') { row.push(cell); cell = '' }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = '' }
+    else cell += c
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row) }
+  return rows.filter((r) => r.some((x) => x !== ''))
+}
+
+function parse(argv) {
+  const o = {}
+  const val = (a, i) => { const v = argv[i + 1]; if (v === undefined) fail(`${a} needs a value.`); return v }
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--help' || a === '-h') { process.stdout.write(USAGE + '\n'); process.exit(0) }
+    else if (a === '--open') o.collapsed = false
+    else if (a === '--db') o.db = val(a, i++)
+    else if (a === '--area') o.area = val(a, i++)
+    else if (a === '--title') o.title = val(a, i++)
+    else if (a === '--summary') o.summary = val(a, i++)
+    else if (a === '--kind') o.kind = val(a, i++)
+    else if (a === '--chart-file') { const f = val(a, i++); try { o.body = fs.readFileSync(f, 'utf8') } catch { fail(`Cannot read ${f}.`) } o.kind = 'chart' }
+    else if (a === '--position') o.position = Number(val(a, i++))
+    else if (a === '--body') o.body = val(a, i++)
+    else if (a === '--body-file') { const f = val(a, i++); try { o.body = fs.readFileSync(f, 'utf8') } catch { fail(`Cannot read ${f}.`) } }
+    else if (a === '--csv-file') {
+      const f = val(a, i++)
+      let t; try { t = fs.readFileSync(f, 'utf8') } catch { fail(`Cannot read ${f}.`) }
+      const r = csv(t.replace(/^﻿/, ''))
+      if (r.length < 1) fail('The CSV is empty.')
+      o.kind = 'table'
+      o.body = JSON.stringify({ columns: r[0], rows: r.slice(1).map((x) => { const y = x.slice(0, r[0].length); while (y.length < r[0].length) y.push(''); return y }) })
+    } else fail(`Unknown option ${a}.\n${USAGE}`)
+  }
+  return o
+}
+
+async function main() {
+  const args = parse(process.argv.slice(2))
+  if (!args.area || !args.title || !args.body) fail(`--area, --title and a body (--body, --body-file or --csv-file) are required.\n${USAGE}`)
+  const url = process.env.FORGED_CONTENT_URL, token = process.env.FORGED_CONTENT_TOKEN
+  if (!url || !token) fail('Set FORGED_CONTENT_URL and FORGED_CONTENT_TOKEN in the environment first.')
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(args), signal: AbortSignal.timeout(60000),
+    })
+  } catch { fail('Could not reach the site. Nothing was saved.', 2) }
+  let body = {}
+  try { body = await res.json() } catch { /* not json */ }
+  if ((res.status === 201 || res.status === 200) && body.id) return process.stdout.write(body.id + '\n')
+  fail(`Not saved: ${body.error || `HTTP ${res.status}`}`, res.status === 422 ? 1 : 2)
+}
+main().catch(() => fail('forged-content failed unexpectedly.'))

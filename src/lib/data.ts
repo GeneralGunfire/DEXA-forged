@@ -199,3 +199,19 @@ export function checkPostImage(file: File): string | null {
   if (file.size > MAX_POST_IMAGE) return `${file.name} is larger than 10 MB.`
   return null
 }
+
+/* ---------- who is signed in ---------- */
+
+/** Display name of the signed-in team member (from the sign-in email), e.g. "Rajen". */
+export function useMe(): string {
+  const [me, setMe] = useState('')
+  useEffect(() => {
+    let on = true
+    supabase.auth.getSession().then(({ data }) => {
+      const raw = (data.session?.user.email ?? '').split('@')[0]
+      if (on) setMe(raw.charAt(0).toUpperCase() + raw.slice(1))
+    })
+    return () => { on = false }
+  }, [])
+  return me
+}

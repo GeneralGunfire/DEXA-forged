@@ -1,0 +1,8 @@
+.dlg--wide { width: min(980px, calc(100vw - 20px)); }
+.viewer { padding: 0 18px 18px; display: grid; gap: 10px; overflow: auto; max-height: calc(100dvh - 120px); }
+.viewer__bar { display: flex; gap: 8px; justify-content: flex-end; }
+.viewer__zoom { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+.viewer__pages { margin-left: auto; color: var(--ink-3); font-weight: 500; }
+.viewer__pdf { display: grid; gap: 12px; justify-items: center; overflow-x: auto; padding: 12px; border-radius: 12px; background: #e8ecf2; }
+.viewer__pdf canvas { background: #fff; box-shadow: 0 6px 20px -10px rgba(6, 20, 64, .45); max-width: none; }
+.viewer__img { max-width: 100%; margin: 0 auto; border-radius: 10px; }

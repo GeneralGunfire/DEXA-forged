@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+/**
+ * forged-log: add an entry to the Forged timeline. No dependencies (Node 18+).
+ * Endpoint and token come ONLY from the environment (FORGED_LOG_URL, FORGED_LOG_TOKEN)
+ * and are never printed. On success it prints the entry id and nothing else.
+ */
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const QUEUE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'forged-log-queue.jsonl')
+const FLAGS = {
+  db: 'db', type: 'type', phase: 'phase', title: 'title', summary: 'summary', detail: 'detail',
+  status: 'status', parent: 'parent', author: 'author', session: 'session_label', when: 'happened_at',
+}
+const USAGE = `Usage:
+  forged-log --db public_hospital --type Error --phase 2 --title "..." --summary "..." \\
+             [--detail "..." | --detail-file error.txt] [--status Open] [--parent <id>]
+  forged-log --flush        send entries that were queued while offline
+
+Options: --db <slug|estate>  --type Action|Error|Response|Fix|Decision|Note  --phase <1|2|text>
+         --title  --summary  --detail  --detail-file  --status Open|Resolved  --parent <entry id>
+         --resolve (with --type Fix and --parent: mark the parent error Resolved)
+         --author Rajen|Huzayfa|Claude Code  --session <label>  --when <ISO date and time>
+Environment: FORGED_LOG_URL, FORGED_LOG_TOKEN`
+
+function fail(msg, code = 1) { process.stderr.write(msg + '\n'); process.exit(code) }
+
+function parse(argv) {
+  const out = {}
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--flush' || a === '--help' || a === '-h') { out[a.replace(/^-+/, '')] = true; continue }
+    if (a === '--resolve') { out.resolve_parent = true; continue }
+    if (a === '--detail-file') {
+      const f = argv[++i]
+      if (!f) fail('--detail-file needs a file name.')
+      try { out.detail = fs.readFileSync(f, 'utf8') } catch { fail(`Cannot read ${f}.`) }
+      continue
+    }
+    const m = a.match(/^--([a-z-]+)(?:=(.*))?$/)
+    if (!m || !FLAGS[m[1]]) fail(`Unknown option ${a.split('=')[0]}.\n${USAGE}`)
+    const v = m[2] !== undefined ? m[2] : argv[++i]
+    if (v === undefined) fail(`${a} needs a value.`)
+    out[FLAGS[m[1]]] = v
+  }
+  return out
+}
+
+/** Returns { id } on success, { retry } when it is worth queuing, or { error } when the site said no. */
+async function send(entry) {
+  const url = process.env.FORGED_LOG_URL
+  const token = process.env.FORGED_LOG_TOKEN
+  if (!url || !token) fail('Set FORGED_LOG_URL and FORGED_LOG_TOKEN in the environment first.')
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(entry),
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch { return { retry: true, why: 'no connection' } }
+  let body = {}
+  try { body = await res.json() } catch { /* not json */ }
+  if (res.status === 201 && body.id) return { id: body.id }
+  // Server errors, rate limits and a bad token are worth retrying later.
+  // A redaction or validation rejection is not: queuing it would only store the text on disk.
+  if (res.status >= 500 || res.status === 429 || res.status === 401) return { retry: true, why: body.error || `HTTP ${res.status}` }
+  return { error: body.error || `Rejected (HTTP ${res.status}).` }
+}
+
+function readQueue() {
+  if (!fs.existsSync(QUEUE)) return []
+  return fs.readFileSync(QUEUE, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+}
+const writeQueue = (rows) => fs.writeFileSync(QUEUE, rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''))
+
+async function main() {
+  const args = parse(process.argv.slice(2))
+  if (args.help || args.h) return process.stdout.write(USAGE + '\n')
+
+  if (args.flush) {
+    const rows = readQueue()
+    if (!rows.length) return process.stderr.write('Nothing queued.\n')
+    const left = []
+    let sent = 0
+    for (const row of rows) {
+      const r = await send(row)
+      if (r.id) { sent++; process.stdout.write(r.id + '\n') }
+      else if (r.retry) left.push(row)
+      else process.stderr.write(`Dropped one queued entry: ${r.error}\n`)
+    }
+    writeQueue(left)
+    if (left.length) fail(`${left.length} entries are still queued (${sent} sent).`, 2)
+    return
+  }
+
+  if (!args.title) fail(`A --title is required.\n${USAGE}`)
+  const r = await send(args)
+  if (r.id) return process.stdout.write(r.id + '\n')
+  if (r.retry) {
+    fs.appendFileSync(QUEUE, JSON.stringify(args) + '\n')
+    return process.stderr.write(`Queued (${r.why}). Run "forged-log --flush" later.\n`)
+  }
+  fail(`Not logged: ${r.error}`)
+}
+
+main().catch(() => fail('forged-log failed unexpectedly.'))

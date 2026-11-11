@@ -7,6 +7,7 @@ import {
 import { Chip, Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
 
 const ACCEPT = '.png,.jpg,.jpeg,.mp4,.pdf'
 const LABELS = ['Logo', 'Image', 'App screenshot', 'Video', 'Document', 'Other']
@@ -28,6 +29,7 @@ function Preview({ a }: { a: Asset }) {
 }
 
 export default function Branding() {
+  const { confirm } = useFeedback()
   const s = sectionByPath('branding')
   const { data, error, loading, reload } = useLoad<Asset[]>(async () =>
     unwrap<Asset[]>(await supabase.from('brand_assets').select('*').order('created_at', { ascending: false })) ?? [])
@@ -47,7 +49,7 @@ export default function Branding() {
     try { await downloadFile(a.path, a.name) } catch (e) { setMsg(describe(e)) }
   }
   async function remove(a: Asset) {
-    if (!window.confirm(`Delete "${a.name}"? This cannot be undone.`)) return
+    if (!await confirm(`Delete "${a.name}"? This cannot be undone.`)) return
     try {
       unwrap(await supabase.from('brand_assets').delete().eq('id', a.id))
       await removeFiles([a.path])

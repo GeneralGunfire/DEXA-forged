@@ -5,6 +5,7 @@ import { Chip, Dialog, EmptyState, Field, LoadState, PageHead } from '../../comp
 import { Bar, Stars } from '../../components/viz'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
 
 export type FeedbackRow = {
   id: string; source: 'explorer' | 'forged' | 'other'; page: string; rating: number | null; message: string
@@ -29,6 +30,7 @@ function timeAgo(iso: string) {
 }
 
 export default function Feedback() {
+  const { confirm } = useFeedback()
   const s = sectionByPath('feedback')
   const { data, error, loading, reload } = useLoad<FeedbackRow[]>(async () =>
     unwrap<FeedbackRow[]>(await supabase.from('feedback').select('*').order('created_at', { ascending: false })) ?? [])
@@ -54,7 +56,7 @@ export default function Feedback() {
     try { unwrap(await supabase.from('feedback').update({ status: next }).eq('id', f.id)); reload() } catch (e) { setMsg(describe(e)) }
   }
   async function remove(f: FeedbackRow) {
-    if (!window.confirm('Delete this feedback? This cannot be undone.')) return
+    if (!await confirm('Delete this feedback? This cannot be undone.')) return
     try { unwrap(await supabase.from('feedback').delete().eq('id', f.id)); reload() } catch (e) { setMsg(describe(e)) }
   }
 

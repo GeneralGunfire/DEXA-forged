@@ -1,8 +1,10 @@
 import { Fragment, useEffect, useRef, type ReactNode } from 'react'
 import { SETUP, useSignedUrl } from '../lib/data'
+import { WaveBand } from './charts'
 import '../pages/app/pages.css'
 
 export function PageHead({ title, blurb, action }: { title: string; blurb?: string; action?: ReactNode }) {
+  useEffect(() => { document.title = `${title} · DEXA Forged` }, [title])
   return (
     <header className="pg__head">
       <div>
@@ -15,8 +17,8 @@ export function PageHead({ title, blurb, action }: { title: string; blurb?: stri
 }
 
 export function Dialog({
-  open, onClose, title, children,
-}: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+  open, onClose, title, children, wide, size, subtitle,
+}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; size?: 'sm' | 'md'; subtitle?: string }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const d = ref.current
@@ -27,14 +29,19 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      className="dlg"
+      className={`dlg${wide ? ' dlg--wide' : ''}${size === 'sm' ? ' dlg--sm' : ''}`}
+      aria-labelledby="dlg-title"
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose() }}
     >
       {open && (
         <div className="dlg__box">
+          <span className="dlg__grip" aria-hidden="true" />
           <header className="dlg__head">
-            <h2>{title}</h2>
+            <div>
+              <h2 id="dlg-title">{title}</h2>
+              {subtitle && <p>{subtitle}</p>}
+            </div>
             <button type="button" className="dlg__x" onClick={onClose} aria-label="Close">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
@@ -71,13 +78,23 @@ export function SetupNotice() {
 export function LoadState({ loading, error, children }: { loading: boolean; error: string | null; children: ReactNode }) {
   if (error === SETUP) return <SetupNotice />
   if (error) return <p className="notice notice--err" role="alert">{error}</p>
-  if (loading) return <p className="muted">Loading…</p>
+  if (loading) return <Skeleton />
   return <>{children}</>
+}
+
+/** A quiet placeholder while a page loads, so the layout does not jump. */
+export function Skeleton() {
+  return (
+    <div className="skel" role="status" aria-busy="true" aria-label="Loading">
+      <i style={{ width: '38%' }} /><i /><i style={{ width: '82%' }} /><i style={{ width: '56%' }} />
+    </div>
+  )
 }
 
 export function EmptyState({ title, text, action }: { title: string; text?: string; action?: ReactNode }) {
   return (
     <div className="empty">
+      <WaveBand className="empty__wave" />
       <p>{title}</p>
       {text && <small>{text}</small>}
       {action}
@@ -114,6 +131,9 @@ export function Rich({ text }: { text: string }) {
     <div className="rich">
       {blocks.map((b, i) => {
         const lines = b.split('\n')
+        if (lines.every((l) => /^>\s?/.test(l))) {
+          return <aside className="callout" key={i}><b>In plain words</b><div>{lines.map((l) => l.replace(/^>\s?/, '')).join(' ')}</div></aside>
+        }
         if (lines.every((l) => /^\s*-\s+/.test(l))) {
           return <ul key={i}>{lines.map((l, j) => <li key={j}>{inline(l.replace(/^\s*-\s+/, ''))}</li>)}</ul>
         }

@@ -18,6 +18,11 @@ export const SECTIONS: Section[] = [
     icon: icon(<><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" /><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></>),
   },
   {
+    path: 'timeline', label: 'Timeline',
+    blurb: 'Everything that has happened across all the databases: actions, errors, fixes and decisions, newest first.',
+    icon: icon(<><path d="M12 3v18" /><circle cx="12" cy="7" r="2" /><circle cx="12" cy="17" r="2" /><path d="M14 7h6M4 17h6" /></>),
+  },
+  {
     path: 'branding', label: 'Branding',
     blurb: 'DEXA logos, images and videos, uploaded and labelled in one place.',
     icon: icon(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.8" /><path d="M21 16l-5-5-8 9" /></>),
@@ -41,6 +46,11 @@ export const SECTIONS: Section[] = [
     path: 'reports', label: 'Reports',
     blurb: 'A plain-language summary of progress, database documentation and feedback for any period. Copy it or save it as a PDF.',
     icon: icon(<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>),
+  },
+  {
+    path: 'settings', label: 'Settings',
+    blurb: 'Access for Claude Code and scripts to write to the timeline.',
+    icon: icon(<><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" /></>),
   },
 ]
 

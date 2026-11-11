@@ -1,0 +1,28 @@
+/* ---------- in-depth content sections (Background and Build record tabs) ---------- */
+.cs { margin-top: 20px; }
+.cs__h { margin: 0 0 10px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.cs__item { border: 1px solid #e6eaf0; border-radius: 14px; background: #fff; }
+.cs__item + .cs__item { margin-top: 8px; }
+.cs__item > summary { position: relative; display: grid; gap: 3px; padding: 14px 44px 14px 16px; cursor: pointer; list-style: none; border-radius: 14px; }
+.cs__item > summary::-webkit-details-marker { display: none; }
+.cs__item > summary::after { content: ''; position: absolute; right: 18px; top: 20px; width: 8px; height: 8px; border-right: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2); transform: rotate(45deg); transition: transform .18s ease; }
+.cs__item[open] > summary::after { transform: rotate(-135deg); top: 24px; }
+.cs__item > summary:hover { background: #f4f6f9; }
+.cs__item > summary:focus-visible { outline: 3px solid rgba(11, 13, 18, 0.35); outline-offset: 0; }
+.cs__title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.cs__sum { color: var(--ink-2); font-size: 13px; line-height: 1.5; max-width: 72ch; }
+.cs__body { padding: 2px 16px 16px; display: grid; gap: 10px; }
+.cs__foot { margin: 0; color: var(--ink-3); font-size: 12px; }
+.cs__bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cs__bar .search { flex: 1 1 200px; min-width: 0; }
+.cs__pre { margin: 0; padding: 12px 14px; max-height: 420px; overflow: auto; border-radius: 10px;  color: #1f2430; font: 12px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere;  border: 1px solid #e0e4ea; background: #fff; }
+.cs__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cs__table th { position: sticky; top: 0; padding: 8px 10px; text-align: left; font-size: 11.5px; font-weight: 700; color: var(--ink-2); background: #f4f6f9; border-bottom: 1px solid #e6eaf0; }
+.cs__table td { padding: 8px 10px; border-bottom: 1px solid #eef1f5; vertical-align: top; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .cs__table, .cs__table tbody, .cs__table tr, .cs__table td { display: block; width: 100%; }
+  .cs__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .cs__table tr { padding: 8px 0; border-bottom: 1px solid #e6eaf0; }
+  .cs__table td { display: grid; grid-template-columns: 38% 1fr; gap: 8px; padding: 3px 2px; border: 0; }
+  .cs__table td::before { content: attr(data-label); color: var(--ink-3); font-size: 11.5px; font-weight: 600; }
+}

@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import { describe, fmtDate, todayStr, unwrap, useLoad, useTeam } from '../../lib/data'
+import { StatTiles } from '../../components/charts'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
+import { useOpenFromQuery } from '../../components/nav'
 
 type Task = {
   id: string; title: string; notes: string; kind: 'task' | 'event'; assignee: string | null
@@ -14,6 +17,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const ymd = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`
 
 export default function Schedule() {
+  const { confirm } = useFeedback()
   const s = sectionByPath('schedule')
   const { team, name: who } = useTeam()
   const { data, error, loading, reload } = useLoad<Task[]>(async () =>
@@ -22,6 +26,7 @@ export default function Schedule() {
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [filter, setFilter] = useState<'open' | 'done' | 'all'>('open')
   const [editing, setEditing] = useState<{ task: Task | null; date?: string } | null>(null)
+  useOpenFromQuery('new', () => setEditing({ task: null }))
   const [msg, setMsg] = useState<string | null>(null)
   const now = new Date()
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() })
@@ -36,7 +41,7 @@ export default function Schedule() {
     } catch (e) { setMsg(describe(e)) }
   }
   async function remove(t: Task) {
-    if (!window.confirm(`Delete "${t.title}"?`)) return
+    if (!await confirm(`Delete "${t.title}"?`)) return
     try {
       unwrap(await supabase.from('tasks').delete().eq('id', t.id))
       reload()
@@ -83,6 +88,21 @@ export default function Schedule() {
   return (
     <div className="pg">
       <PageHead title={s.label} blurb={s.blurb} action={<button type="button" className="btn btn--dark" onClick={() => setEditing({ task: null })}>New task or event</button>} />
+
+      {all.length > 0 && (() => {
+        const week = new Date(); week.setDate(week.getDate() + 7)
+        const wk = `${week.getFullYear()}-${String(week.getMonth() + 1).padStart(2, '0')}-${String(week.getDate()).padStart(2, '0')}`
+        const overdue = open.filter((t) => t.due_date && t.due_date < today).length
+        const soon = open.filter((t) => t.due_date && t.due_date >= today && t.due_date <= wk).length
+        return (
+          <StatTiles items={[
+            { value: open.length, label: open.length === 1 ? 'open item' : 'open items' },
+            { value: overdue, label: 'overdue', alert: overdue > 0 },
+            { value: soon, label: 'due in the next 7 days' },
+            { value: all.filter((t) => t.done).length, label: 'done' },
+          ]} />
+        )
+      })()}
 
       {msg && <p className="notice notice--err" role="alert">{msg}</p>}
 
