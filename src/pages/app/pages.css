@@ -261,3 +261,26 @@
   .report .pg__head h1 { display: none; }
   .rsec, .rtiles > div, .dbscores li { break-inside: avoid; background: #f6f8fc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---------- database board: grouped by machine, quiet cards ---------- */
+.dbgroup + .dbgroup { margin-top: 28px; }
+.dbgroup__h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font-size: 14px; font-weight: 700; letter-spacing: -0.005em; color: var(--ink); }
+.dbgroup__h span { color: var(--ink-3); font-size: 12.5px; font-weight: 600; }
+.dbgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.dbcard2 { display: grid; gap: 4px; align-content: start; padding: 16px 16px 14px; border: 1px solid #e6eaf0; border-radius: 14px; background: #fff; color: inherit; text-decoration: none; transition: border-color .15s ease, background .15s ease; }
+.dbcard2:hover { border-color: #b4bcc8; background: #fafbfc; }
+.dbcard2:focus-visible { outline: 3px solid rgba(11, 13, 18, 0.35); outline-offset: 2px; }
+.dbcard2 h3 { margin: 0; font-size: 15px; letter-spacing: -0.01em; line-height: 1.3; }
+.dbcard2 p { margin: 0; color: var(--ink-2); font-size: 12.5px; }
+.dbcard2__bar { position: relative; margin-top: 10px; height: 4px; border-radius: 4px; background: #e6eaf0; }
+.dbcard2__bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--ink); }
+.dbcard2__bar span { position: absolute; top: 9px; left: 0; color: var(--ink-3); font-size: 11.5px; white-space: nowrap; }
+.dbcard2 { padding-bottom: 30px; }
+
+/* ---------- record header: a slim documentation bar ---------- */
+.cbar { margin: 0 0 18px; }
+.cbar__row { display: flex; align-items: center; gap: 14px; }
+.cbar__row strong { flex: none; font-size: 13px; }
+.cbar__track { position: relative; flex: 1; max-width: 240px; height: 4px; border-radius: 4px; background: #e6eaf0; }
+.cbar__track i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--ink); }
+.cbar p { margin: 5px 0 0; color: var(--ink-3); font-size: 12.5px; line-height: 1.45; }

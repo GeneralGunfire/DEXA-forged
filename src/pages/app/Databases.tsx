@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import { supabase } from '../../lib/supabase'
 import { describe, fmtDate, todayStr, unwrap, useLoad } from '../../lib/data'
 import { Dialog, EmptyState, Field, LoadState, PageHead, Rich } from '../../components/ui'
-import { ScoreRing } from '../../components/viz'
 import { completeness, countBy } from '../../lib/completeness'
 import { DocumentsPanel } from './Documents'
 import { DbDocuments } from './DbDocuments'
@@ -30,8 +29,21 @@ export function DatabaseBoard() {
   const [adding, setAdding] = useState(false)
   // how many log entries and documents each database has, for the completeness score
   const counts = useLoad<{ log: Record<string, number>; docs: Record<string, number> }>(async () => {
-    const [e, d] = await Promise.all([supabase.from('db_entries').select('database_id'), supabase.from('documents').select('database_id')])
-    return { log: countBy(unwrap<{ database_id: string }[]>(e) ?? []), docs: countBy(unwrap<{ database_id: string | null }[]>(d) ?? []) }
+    const [e, d, t, dd] = await Promise.all([
+      supabase.from('db_entries').select('database_id'), supabase.from('documents').select('database_id'),
+      supabase.from('timeline_entries').select('database_id'), supabase.from('db_documents').select('database_id'),
+    ])
+    const sum = (a: Record<string, number>, b: Record<string, number>) => {
+      const o = { ...a }
+      for (const k of Object.keys(b)) o[k] = (o[k] ?? 0) + b[k]
+      return o
+    }
+    // the newer tables may not exist yet on an older database, so a missing table counts as nothing
+    const rows = (r: { data: unknown; error: unknown }) => (r.error ? [] : ((r.data as { database_id: string | null }[]) ?? []))
+    return {
+      log: sum(countBy(unwrap<{ database_id: string }[]>(e) ?? []), countBy(rows(t))),
+      docs: sum(countBy(unwrap<{ database_id: string | null }[]>(d) ?? []), countBy(rows(dd))),
+    }
   })
 
   return (
@@ -45,21 +57,33 @@ export function DatabaseBoard() {
             action={<button type="button" className="btn btn--dark" onClick={() => setAdding(true)}>New database</button>}
           />
         ) : (
-          <div className="tiles">
-            {(data ?? []).map((d) => (
-              <Link key={d.id} to={`/app/databases/${d.id}`} className="dbcard">
-                <div className="dbcard__top">
-                  <h3>{d.name}</h3>
-                  {counts.data && <ScoreRing pct={completeness(d, counts.data.log[d.id] ?? 0, counts.data.docs[d.id] ?? 0).pct} size={42} />}
+          <>
+            {[
+              { label: "Machine A: Rajen's PC", list: (data ?? []).filter((d) => d.machine === MACHINES[0]) },
+              { label: "Machine B: Huzayfa's laptop", list: (data ?? []).filter((d) => d.machine === MACHINES[1]) },
+              { label: 'Other', list: (data ?? []).filter((d) => d.machine !== MACHINES[0] && d.machine !== MACHINES[1]) },
+            ].filter((g) => g.list.length > 0).map((g) => (
+              <section key={g.label} className="dbgroup" aria-label={g.label}>
+                <h2 className="dbgroup__h">{g.label} <span>{g.list.length}</span></h2>
+                <div className="dbgrid">
+                  {[...g.list].sort((x, y) => x.name.localeCompare(y.name)).map((d) => {
+                    const pct = counts.data ? completeness(d, counts.data.log[d.id] ?? 0, counts.data.docs[d.id] ?? 0).pct : null
+                    return (
+                      <Link key={d.id} to={`/app/databases/${d.id}`} className="dbcard2">
+                        <h3>{d.name}</h3>
+                        <p>{[d.db_type, d.status].filter(Boolean).join(' · ') || 'No details yet'}</p>
+                        {pct !== null && (
+                          <div className="dbcard2__bar" role="img" aria-label={`${pct}% documented`}>
+                            <i style={{ width: `${pct}%` }} /><span>{pct}% documented</span>
+                          </div>
+                        )}
+                      </Link>
+                    )
+                  })}
                 </div>
-                <dl>
-                  <div><dt>Machine</dt><dd>{d.machine || '—'}</dd></div>
-                  <div><dt>Type</dt><dd>{d.db_type || '—'}</dd></div>
-                  {d.status && <div><dt>Status</dt><dd>{d.status}</dd></div>}
-                </dl>
-              </Link>
+              </section>
             ))}
-          </div>
+          </>
         )}
       </LoadState>
       <Dialog open={adding} onClose={() => setAdding(false)} title="New database">
@@ -254,25 +278,24 @@ function ConnectionPanel({ db, onSaved }: { db: Db; onSaved: () => void }) {
 function CompletenessPanel({ db }: { db: Db }) {
   const { data } = useLoad<{ log: number; docs: number }>(async () => {
     const head = { count: 'exact', head: true } as const
-    const [e, d] = await Promise.all([
+    const [e, d, t, dd] = await Promise.all([
       supabase.from('db_entries').select('id', head).eq('database_id', db.id),
       supabase.from('documents').select('id', head).eq('database_id', db.id),
+      supabase.from('timeline_entries').select('id', head).eq('database_id', db.id),
+      supabase.from('db_documents').select('id', head).eq('database_id', db.id),
     ])
-    return { log: e.count ?? 0, docs: d.count ?? 0 }
+    // dated documents and timeline entries count too; a table that does not exist yet counts as nothing
+    return { log: (e.count ?? 0) + (t.error ? 0 : t.count ?? 0), docs: (d.count ?? 0) + (dd.error ? 0 : dd.count ?? 0) }
   }, [db.id, db.background, db.shortfalls, db.build_record, db.port, db.instance_name, db.machine, db.db_type])
   if (!data) return null
   const c = completeness(db, data.log, data.docs)
   return (
-    <section className="cpanel" aria-label="Documentation progress">
-      <ScoreRing pct={c.pct} size={64} />
-      <div>
-        <strong>{c.have} of {c.total} documented</strong>
-        {c.missing.length === 0 ? (
-          <p>Everything this card needs is filled in.</p>
-        ) : (
-          <p>Still missing: {c.missing.map((m) => m.label.toLowerCase()).join(', ')}.</p>
-        )}
+    <section className="cbar" aria-label="Documentation progress">
+      <div className="cbar__row">
+        <strong>{c.have} of {c.total} parts documented</strong>
+        <div className="cbar__track" role="img" aria-label={`${c.pct}% documented`}><i style={{ width: `${c.pct}%` }} /></div>
       </div>
+      <p>{c.missing.length === 0 ? 'Everything this record needs is filled in.' : `Still missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}.`}</p>
     </section>
   )
 }

@@ -30,17 +30,22 @@ export default function Reports() {
   const [copied, setCopied] = useState(false)
 
   const { data, error, loading } = useLoad<Raw>(async () => {
-    const [tasks, dbs, entries, docs, posts, fb] = await Promise.all([
+    const [tasks, dbs, entries, docs, posts, fb, tl, dd] = await Promise.all([
       supabase.from('tasks').select('id,title,kind,assignee,due_date,done,created_at'),
       supabase.from('databases').select('id,name,machine,db_type,background,shortfalls,port,instance_name,build_record'),
       supabase.from('db_entries').select('database_id,entry_date'),
       supabase.from('documents').select('database_id,created_at'),
       supabase.from('posts').select('posted_at'),
       supabase.from('feedback').select('rating,page,status,message,created_at'),
+      supabase.from('timeline_entries').select('database_id,happened_at'),
+      supabase.from('db_documents').select('database_id,created_at'),
     ])
+    // timeline entries count as development log entries and dated documents as documents; a table that is not set up yet counts as none
+    const tlRows = tl.error ? [] : ((tl.data ?? []) as { database_id: string | null; happened_at: string }[]).map((x) => ({ database_id: x.database_id, entry_date: x.happened_at.slice(0, 10) }))
+    const ddRows = dd.error ? [] : ((dd.data ?? []) as { database_id: string | null; created_at: string }[])
     return {
-      tasks: unwrap<Task[]>(tasks) ?? [], dbs: unwrap<Db[]>(dbs) ?? [], entries: unwrap<Raw['entries']>(entries) ?? [],
-      docs: unwrap<Raw['docs']>(docs) ?? [], posts: unwrap<Raw['posts']>(posts) ?? [],
+      tasks: unwrap<Task[]>(tasks) ?? [], dbs: unwrap<Db[]>(dbs) ?? [], entries: [...(unwrap<Raw['entries']>(entries) ?? []), ...tlRows] as Raw['entries'],
+      docs: [...(unwrap<Raw['docs']>(docs) ?? []), ...ddRows] as Raw['docs'], posts: unwrap<Raw['posts']>(posts) ?? [],
       // feedback is optional until feedback.sql has been run: a missing table just means none yet
       fb: fb.error ? [] : (unwrap<Fb[]>(fb) ?? []),
     }

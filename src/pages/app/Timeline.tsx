@@ -17,7 +17,6 @@ export type DbLite = { id: string; name: string; slug: string | null }
 type DocLink = { id: string; name: string; entry_id: string; database_id: string }
 type Edit = { id: string; edited_by: string | null; edited_at: string; previous: Partial<Entry> }
 
-const typeClass = (t: string) => `tl-type tl-type--${t.toLowerCase()}`
 
 /* ---------------- global page ---------------- */
 
@@ -34,20 +33,8 @@ export default function GlobalTimeline() {
 
 /* ---------------- the timeline itself (one database, or everything) ---------------- */
 
-const ICON: Record<string, string> = {
-  Action: 'M8 5v14l11-7z',
-  Error: 'M12 7v6M12 17h.01',
-  Response: 'M9 14l-5-4 5-4M4 10h10a6 6 0 0 1 6 6v2',
-  Fix: 'M5 12l5 5 9-10',
-  Decision: 'M12 4l8 8-8 8-8-8z',
-  Note: 'M6 7h12M6 12h12M6 17h7',
-}
 function Dot({ type, open }: { type: string; open?: boolean }) {
-  return (
-    <span className={`tl-node-dot tl-node-dot--${type.toLowerCase()}${open ? ' is-open' : ''}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill={type === 'Action' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d={ICON[type] ?? ICON.Note} /></svg>
-    </span>
-  )
+  return <span className={`tl-node-dot tl-node-dot--${type.toLowerCase()}${open ? ' is-open' : ''}`} aria-hidden="true" />
 }
 
 const ago = (iso: string) => {
@@ -164,28 +151,21 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
   const filterCount = activeFilterCount(filters, !!databaseId) - (filters.q ? 1 : 0)
   return (
     <>
-      <section className="tl-head" aria-label="Timeline summary">
-        <span className="tl-live" aria-hidden="true" />
-        <div>
-          <strong>Claude Code keeps this timeline up to date as it works.</strong>
-          <p>
-            {last ? `Last logged ${ago(last.happened_at)}.` : 'Nothing logged by Claude Code yet.'}{' '}
-            {fromClaude} of {all.length} {all.length === 1 ? 'entry' : 'entries'} came from Claude Code
-            {openErrors > 0 ? `, and ${openErrors} ${openErrors === 1 ? 'error is' : 'errors are'} still open.` : '.'}
-          </p>
-        </div>
-      </section>
+      <p className="tl-note">
+        <b>Claude Code keeps this timeline up to date as it works.</b>{' '}
+        {last ? `Last logged ${ago(last.happened_at)}.` : 'Nothing logged by Claude Code yet.'}{' '}
+        {fromClaude} of {all.length} {all.length === 1 ? 'entry' : 'entries'} came from Claude Code
+        {openErrors > 0 ? `, and ${openErrors} ${openErrors === 1 ? 'error is' : 'errors are'} still open.` : '.'}
+      </p>
 
-      {days.length > 1 && (
+      {days.length > 7 && (
         <div className="tl-scrub" role="group" aria-label="Activity by day. Choose a day to jump to it.">
           {days.map(([d, r]) => {
             const total = Object.values(r).reduce((a, b) => a + b, 0)
             return (
               <button type="button" key={d} className={`tl-scrub__bar${d === activeDay ? ' is-on' : ''}`} onClick={() => jumpDay(d)}
                 title={`${fmtDay(d)}: ${total} ${total === 1 ? 'entry' : 'entries'}`} aria-label={`${fmtDay(d)}, ${total} ${total === 1 ? 'entry' : 'entries'}`}>
-                <span style={{ height: `${Math.max(14, (total / peak) * 100)}%` }}>
-                  {TYPES.filter((t) => r[t]).map((t) => <i key={t} className={`tl-seg tl-seg--${t.toLowerCase()}`} style={{ flexGrow: r[t] }} />)}
-                </span>
+                <span style={{ height: `${Math.max(14, (total / peak) * 100)}%` }} />
               </button>
             )
           })}
@@ -206,12 +186,10 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
         <button type="button" className="btn" onClick={() => setEditing({})}>Add manual entry</button>
       </div>
 
-      <div className="tl-legend" role="group" aria-label="Filter by type">
+      <div className="seg tl-types" role="group" aria-label="Filter by type">
+        <button type="button" aria-pressed={filters.type === ''} onClick={() => set('type', '')}>All types</button>
         {TYPES.map((t) => (
-          <button type="button" key={t} className={`tl-legend__b${filters.type === t ? ' is-on' : ''}`} aria-pressed={filters.type === t}
-            onClick={() => set('type', filters.type === t ? '' : t)}>
-            <Dot type={t} />{t}
-          </button>
+          <button type="button" key={t} aria-pressed={filters.type === t} onClick={() => set('type', filters.type === t ? '' : t)}>{t}</button>
         ))}
       </div>
 
@@ -317,7 +295,7 @@ function TlRow({
         <div className="tl-body">
           <button type="button" className="tl-head-btn" aria-expanded={open} onClick={() => onToggle(e.id)}>
             <span className="tl-line1">
-              <span className={typeClass(e.type)}>{e.type}</span>
+              <span className="tl-type">{e.type}</span>
               {e.type === 'Error' && e.status && <span className={`tl-status tl-status--${e.status.toLowerCase()}`}>{e.status}</span>}
               <span className={`tl-by${robot ? ' tl-by--cc' : ''}`}>{e.author}</span>
               {dbName !== null && <span className="tl-dbtag">{dbName}</span>}

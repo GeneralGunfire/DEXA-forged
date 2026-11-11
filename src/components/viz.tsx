@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 
-/** A circular score, 0 to 100. Colour shifts from red through amber to green as it fills. */
+/** A circular score, 0 to 100. Neutral ink: a low score is information, not an alarm. */
 export function ScoreRing({ pct, size = 56, label }: { pct: number; size?: number; label?: ReactNode }) {
   const r = (size - 8) / 2
   const c = 2 * Math.PI * r
-  const color = pct >= 80 ? '#16a34a' : pct >= 50 ? '#d99a06' : '#dc2626'
+  const color = '#0b0d12'
   return (
     <span className="ring" style={{ width: size, height: size }} role="img" aria-label={`${pct} percent complete`}>
       <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
