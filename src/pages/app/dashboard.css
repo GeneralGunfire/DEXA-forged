@@ -4,7 +4,7 @@
 .dash__eyebrow { margin: 0 0 4px; color: var(--ink-3); font-size: 13px; font-weight: 600; }
 .dash__head h2 { margin: 0; font-size: clamp(22px, 2.6vw, 28px); letter-spacing: -0.025em; font-weight: 800; color: var(--navy, #111827); line-height: 1.15; }
 .dash__quick { display: flex; flex-wrap: wrap; gap: 8px; }
-.dash__since { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0; padding: 11px 14px; border-left: 3px solid var(--blue, #111827); border-radius: 0 10px 10px 0; background: #f6f7f9; font-size: 13.5px; color: var(--ink); }
+.dash__since { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0; padding: 11px 14px; border-left: 3px solid var(--blue, #111827); border-radius: 0 10px 10px 0;  font-size: 13.5px; color: var(--ink);  border: 1px solid #e0e4ea; background: #fff; }
 .dash__since b { color: var(--blue, #111827); font-size: 12px; }
 .dash .gl { margin: 0; }
 .dash__cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 14px; align-items: start; }
