@@ -32,18 +32,18 @@ export default function Settings() {
     ev.preventDefault()
     const form = ev.currentTarget
     const submitter = (ev.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
-    const scope = submitter?.value === 'content' ? 'content' : 'log'
+    const scope = submitter?.value === 'content' ? 'content' : submitter?.value === 'read' ? 'read' : 'log'
     const label = String(new FormData(form).get('label') ?? '').trim()
     if (!label) return setErr('Name the token, for example "Phase 2 Claude Code".')
     setBusy(true)
     try {
-      const token = newToken(scope === 'content' ? 'fgc_' : 'fgl_')
+      const token = newToken(scope === 'content' ? 'fgc_' : scope === 'read' ? 'fgr_' : 'fgl_')
       unwrap(await supabase.from('log_tokens').insert({ label, scope, token_hash: await sha256Hex(token) }))
       setFresh(token); setShown(false); setCopied(false); setErr(null); form.reset(); reload()
     } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
   async function revoke(t: Tok) {
-    if (!await confirm(`Revoke "${t.label}"? Anything using it will stop being able to log. This cannot be undone.`)) return
+    if (!await confirm(`Revoke "${t.label}"? Anything using it will stop working. This cannot be undone.`)) return
     try { unwrap(await supabase.from('log_tokens').update({ revoked_at: new Date().toISOString() }).eq('id', t.id)); reload(); toast('Token revoked') } catch (e) { setErr(describe(e)) }
   }
   async function copy() {
@@ -58,7 +58,7 @@ export default function Settings() {
       <section className="panel">
         <h3>Log access</h3>
         <p className="muted" style={{ marginBottom: 14 }}>
-          A log token lets Claude Code and scripts add timeline entries without signing in. A content token lets it write the in-depth Background and Build record sections. Each can only write its own kind of content; neither can read or delete anything.
+          A log token lets Claude Code and scripts add timeline entries without signing in. A content token lets it write the in-depth Background and Build record sections. Each can only write its own kind of content; neither can read or delete anything. A read token lets Claude Code read a record's context (background, build record, timeline, estate pages and document names) and cannot change anything.
         </p>
 
         {fresh && (
@@ -77,6 +77,7 @@ export default function Settings() {
           <div style={{ flex: '1 1 220px' }}><Field label="Token name"><input type="text" name="label" maxLength={80} placeholder="e.g. Phase 2 Claude Code" /></Field></div>
           <button type="submit" name="scope" value="log" className="btn btn--dark" disabled={busy} style={{ marginBottom: 14 }}>{busy ? 'Creating…' : 'Create log token'}</button>
           <button type="submit" name="scope" value="content" className="btn" disabled={busy} style={{ marginBottom: 14 }}>Create content token</button>
+          <button type="submit" name="scope" value="read" className="btn" disabled={busy} style={{ marginBottom: 14 }}>Create read token</button>
         </form>
         {err && <p className="formerr" role="alert">{err}</p>}
 
@@ -89,7 +90,7 @@ export default function Settings() {
               {(data ?? []).map((t) => (
                 <div className={`tok${t.revoked_at ? ' is-revoked' : ''}`} key={t.id}>
                   <div className="item__main">
-                    <p className="item__title">{t.label} <span className="chip">{t.scope === 'content' ? 'Content' : 'Log'}</span></p>
+                    <p className="item__title">{t.label} <span className="chip">{t.scope === 'content' ? 'Content' : t.scope === 'read' ? 'Read' : 'Log'}</span></p>
                     <p className="item__meta">
                       Created {fmtDate(t.created_at)} · {t.last_used_at ? `last used ${fmtDate(t.last_used_at)}` : 'never used'}
                       {t.revoked_at ? ` · revoked ${fmtDate(t.revoked_at)}` : ''}
@@ -112,6 +113,9 @@ export default function Settings() {
         <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_CONTENT_URL</b></p>
         <code style={{ display: 'block', overflowWrap: 'anywhere' }}>{endpoint.replace('log-ingest', 'content-write')}</code>
         <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_CONTENT_TOKEN</b> is the content token.</p>
+        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_READ_URL</b></p>
+        <code style={{ display: 'block', overflowWrap: 'anywhere' }}>{endpoint.replace('log-ingest', 'forge-read')}</code>
+        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_READ_TOKEN</b> is the read token. Read tokens are used with <code>forged-read</code>; details are in <code>docs/forged-read.md</code>.</p>
       </section>
     </div>
   )

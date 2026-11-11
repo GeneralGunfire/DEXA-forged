@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+/**
+ * forged-read: read context from Forged, to standard output only. No dependencies (Node 18+).
+ * Endpoint and token come ONLY from the environment (FORGED_READ_URL, FORGED_READ_TOKEN) and are never printed.
+ * It writes no files and keeps no cache or queue. For context only: it never changes anything on the site.
+ */
+const USAGE = `Usage:
+  forged-read --db public_hospital --what background
+  forged-read --db estate --what timeline --since 2026-11-01 --limit 30
+  forged-read                      (overview of every database)
+
+Options: --db <slug|estate>
+         --what overview|background|build|timeline|estate|documents-list   (default overview)
+         --limit <1-200>   entries or sections (default 50)
+         --since <date>    timeline only: entries from this date on
+Environment: FORGED_READ_URL, FORGED_READ_TOKEN`
+
+const fail = (m, code = 1) => { process.stderr.write(m + '\n'); process.exit(code) }
+const FLAGS = new Set(['db', 'what', 'limit', 'since'])
+
+function parse(argv) {
+  const o = {}
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--help' || a === '-h') { process.stdout.write(USAGE + '\n'); process.exit(0) }
+    const m = a.match(/^--([a-z-]+)(?:=(.*))?$/)
+    if (!m || !FLAGS.has(m[1])) fail(`Unknown option ${a.split('=')[0]}.\n${USAGE}`)
+    const v = m[2] !== undefined ? m[2] : argv[++i]
+    if (v === undefined) fail(`${a} needs a value.`)
+    o[m[1]] = m[1] === 'limit' ? Number(v) : v
+  }
+  return o
+}
+
+async function main() {
+  const args = parse(process.argv.slice(2))
+  const url = process.env.FORGED_READ_URL, token = process.env.FORGED_READ_TOKEN
+  if (!url || !token) fail('Set FORGED_READ_URL and FORGED_READ_TOKEN in the environment first.')
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(args), signal: AbortSignal.timeout(30000),
+    })
+  } catch { fail('Could not reach the site. Nothing was read.', 2) }
+  let body = {}
+  try { body = await res.json() } catch { /* not json */ }
+  if (res.status === 200 && typeof body.text === 'string') return process.stdout.write(body.text + '\n')
+  fail(`Not read: ${body.error || `HTTP ${res.status}`}`, res.status === 422 ? 1 : 2)
+}
+main().catch(() => fail('forged-read failed unexpectedly.'))
