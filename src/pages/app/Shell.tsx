@@ -3,7 +3,7 @@ import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { ROADMAP } from '../../data/roadmap'
-import { fmtDate, postImageUrl, SETUP, unwrap, useLoad } from '../../lib/data'
+import { fmtDate, postImageUrl, SETUP, todayStr, unwrap, useLoad } from '../../lib/data'
 import { plainExcerpt, SetupNotice } from '../../components/ui'
 import { SECTIONS } from './sections'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
@@ -129,17 +129,38 @@ function Home({ name }: { name: string }) {
 
 /* ---------------- layout with the sidebar ---------------- */
 
-/** The sidebar, grouped by what each section is for. */
+/** The sidebar: a short primary group, then two quiet groups. */
 const NAV = [
-  { label: 'Workspace', items: ['home', 'messages', 'schedule', 'documents'] },
-  { label: 'Databases', items: ['databases', 'timeline'] },
-  { label: 'Insight', items: ['reports', 'feedback'] },
-  { label: 'Admin', items: ['branding', 'settings'] },
+  { label: '', items: ['home', 'databases', 'timeline', 'documents'] },
+  { label: 'Team', items: ['messages', 'schedule', 'feedback'] },
+  { label: 'Manage', items: ['reports', 'branding', 'settings'] },
 ]
+
+/** Small live counts shown beside a menu item: open errors, overdue tasks, unread feedback. */
+function useNavCounts() {
+  const q = useLoad<{ errors: number; overdue: number; feedback: number }>(async () => {
+    const head = { count: 'exact', head: true } as const
+    const [e, t, f] = await Promise.all([
+      supabase.from('timeline_entries').select('id', head).eq('type', 'Error').eq('status', 'Open'),
+      supabase.from('tasks').select('id', head).eq('done', false).lt('due_date', todayStr()),
+      supabase.from('feedback').select('id', head).eq('status', 'new'),
+    ])
+    return { errors: e.error ? 0 : e.count ?? 0, overdue: t.error ? 0 : t.count ?? 0, feedback: f.error ? 0 : f.count ?? 0 }
+  })
+  const { reload } = q
+  useEffect(() => {
+    const i = setInterval(() => { if (document.visibilityState === 'visible') reload() }, 60000)
+    return () => clearInterval(i)
+  }, [reload])
+  return q.data
+}
 
 function Layout({ display, email }: { display: string; email: string }) {
   const loc = useLocation()
   const [searching, setSearching] = useState(false)
+  const counts = useNavCounts()
+  const [rail, setRail] = useState(() => { try { return localStorage.getItem('forged_rail') === '1' } catch { return false } })
+  const toggleRail = () => setRail((r) => { try { localStorage.setItem('forged_rail', r ? '0' : '1') } catch { /* storage blocked */ } return !r })
   // Ctrl+K or ⌘K opens the search from anywhere
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearching(true) } }
@@ -147,35 +168,49 @@ function Layout({ display, email }: { display: string; email: string }) {
     return () => window.removeEventListener('keydown', h)
   }, [])
   const linkClass = ({ isActive }: { isActive: boolean }) => `ws__link${isActive ? ' is-active' : ''}`
-  const item = (to: string, label: string, ico: ReactNode, end = false) => (
-    <NavLink key={to} to={to} end={end} className={linkClass}>
-      {ico}
-      <span>{label}</span>
-    </NavLink>
-  )
+  const badge: Record<string, { n: number; tone: 'bad' | 'info'; what: string } | undefined> = {
+    timeline: counts && counts.errors > 0 ? { n: counts.errors, tone: 'bad', what: 'open errors' } : undefined,
+    schedule: counts && counts.overdue > 0 ? { n: counts.overdue, tone: 'bad', what: 'overdue tasks' } : undefined,
+    feedback: counts && counts.feedback > 0 ? { n: counts.feedback, tone: 'info', what: 'new feedback' } : undefined,
+  }
+  const item = (key: string, to: string, label: string, ico: ReactNode, end = false) => {
+    const bd = badge[key]
+    return (
+      <NavLink key={to} to={to} end={end} className={linkClass} title={rail ? label : undefined}>
+        {ico}
+        <span className="ws__lbl">{label}</span>
+        {bd && <b className={`ws__badge ws__badge--${bd.tone}`} aria-label={`${bd.n} ${bd.what}`}>{bd.n > 99 ? '99+' : bd.n}</b>}
+      </NavLink>
+    )
+  }
 
   return (
     <FeedbackProvider>
-    <div className="ws">
+    <div className={`ws${rail ? ' ws--rail' : ''}`}>
       <aside className="ws__side">
         <div className="ws__sidein">
-          <Link to="/" className="ws__logo" aria-label="DEXA Forged, public site">
-            <img src="/dexa-logo-navy.png" alt="DEXA" />
-            <span>Forged</span>
-          </Link>
+          <div className="ws__top">
+            <Link to="/" className="ws__logo" aria-label="DEXA Forged, public site">
+              <img src="/dexa-logo-navy.png" alt="DEXA" />
+              <span>Forged</span>
+            </Link>
+            <button type="button" className="ws__railbtn" onClick={toggleRail} aria-label={rail ? 'Expand the menu' : 'Collapse the menu'} aria-pressed={rail} title={rail ? 'Expand the menu' : 'Collapse the menu'}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 6l-6 6 6 6" /></svg>
+            </button>
+          </div>
 
-          <button type="button" className="ws__search" onClick={() => setSearching(true)} aria-label="Search the workspace">
+          <button type="button" className="ws__search" onClick={() => setSearching(true)} aria-label="Search the workspace" title={rail ? 'Search (Ctrl K)' : undefined}>
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-            <span>Search</span><kbd>Ctrl K</kbd>
+            <span className="ws__lbl">Search</span><kbd>Ctrl K</kbd>
           </button>
           <nav className="ws__nav" aria-label="Workspace">
-            {NAV.map((g) => (
-              <div className="ws__navgroup" key={g.label} role="group" aria-label={g.label}>
-                <p className="ws__group">{g.label}</p>
+            {NAV.map((g, i) => (
+              <div className="ws__navgroup" key={i} role="group" aria-label={g.label || 'Main'}>
+                {g.label && <p className="ws__group">{g.label}</p>}
                 {g.items.map((k) => {
-                  if (k === 'home') return item('/app', 'Home', homeIcon, true)
-                  const s = SECTIONS.find((x) => x.path === k)
-                  return s ? item(`/app/${s.path}`, s.label, s.icon) : null
+                  if (k === 'home') return item(k, '/app', 'Home', homeIcon, true)
+                  const sec = SECTIONS.find((x) => x.path === k)
+                  return sec ? item(k, `/app/${sec.path}`, sec.label, sec.icon) : null
                 })}
               </div>
             ))}
@@ -183,7 +218,7 @@ function Layout({ display, email }: { display: string; email: string }) {
 
           <div className="ws__user">
             <span className="ws__avatar" aria-hidden="true">{display.charAt(0)}</span>
-            <div className="ws__who">
+            <div className="ws__who ws__lbl">
               <strong>{display}</strong>
               <small title={email}>{email}</small>
             </div>

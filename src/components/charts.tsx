@@ -107,9 +107,9 @@ export function Columns({ data, activeKey, onSelect, height = 84, ariaLabel }: {
           const tip = d.tip ?? `${d.label}: ${d.value}`
           const bar = <i style={{ height: `${Math.max(d.value > 0 ? 4 : 0, (d.value / top) * 100)}%` }} />
           return onSelect ? (
-            <button type="button" key={d.key} className={`co__c${d.key === activeKey ? ' is-on' : ''}`} title={tip} aria-label={tip} onClick={() => onSelect(d.key)}>{bar}</button>
+            <button type="button" key={d.key} className={`co__c${d.key === activeKey ? ' is-on' : ''}`} data-tip={tip} aria-label={tip} onClick={() => onSelect(d.key)}>{bar}</button>
           ) : (
-            <span key={d.key} className="co__c" title={tip} role="img" aria-label={tip}>{bar}</span>
+            <span key={d.key} className="co__c" data-tip={tip} role="img" aria-label={tip}>{bar}</span>
           )
         })}
       </div>

@@ -269,9 +269,6 @@
 .dbgroup__h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font-size: 14px; font-weight: 700; letter-spacing: -0.005em; color: var(--ink); }
 .dbgroup__h span { color: var(--ink-3); font-size: 12.5px; font-weight: 600; }
 .dbgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
-.dbcard2__bar { position: relative; margin-top: 10px; height: 4px; border-radius: 4px; background: #e6eaf0; }
-.dbcard2__bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--ink); }
-.dbcard2__bar span { position: absolute; top: 9px; left: 0; color: var(--ink-3); font-size: 11.5px; white-space: nowrap; }
 
 /* ---------- record header: a slim documentation bar ---------- */
 .cbar { margin: 0 0 18px; }
@@ -283,20 +280,6 @@
 
 
 /* ---------- database cards ---------- */
-.dbcard2 { display: grid; gap: 6px; align-content: start; padding: 16px 16px 18px; border: 1px solid #e6eaf0; border-radius: 14px; background: #fff; color: inherit; text-decoration: none; position: relative; transition: border-color .15s ease, box-shadow .2s ease; }
-.dbcard2:hover { border-color: #b4bcc8; box-shadow: 0 10px 24px -18px rgba(6, 20, 64, 0.4); }
-.dbcard2:focus-visible { outline: 3px solid rgba(11, 13, 18, 0.35); outline-offset: 2px; }
-.dbcard2__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.dbcard2__top h3 { margin: 0; font-size: 15px; letter-spacing: -0.01em; line-height: 1.3; }
-.dbcard2__top svg { flex: none; margin-top: 2px; color: #b4bcc8; transition: transform .18s ease, color .15s ease; }
-.dbcard2:hover .dbcard2__top svg { color: var(--ink); transform: translateX(2px); }
-.dbcard2__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; color: var(--ink-2); font-size: 12.5px; }
-.dbcard2__status { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-3); }
-.dbcard2__status i { width: 6px; height: 6px; border-radius: 50%; background: #9aa4b2; }
-.dbcard2__foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; color: var(--ink-3); font-size: 11.5px; }
-.dbcard2__open { color: #b42318; font-weight: 600; }
-.dbcard2__bar { display: block; position: relative; height: 3px; border-radius: 3px; background: #eef1f5; overflow: hidden; }
-.dbcard2__bar i { position: absolute; inset: 0 auto 0 0; background: var(--ink); border-radius: 3px; }
 
 /* ---------- inline meter (reports) and loading skeleton ---------- */
 .meter { display: inline-flex; align-items: center; gap: 8px; width: 110px; flex: none; }
@@ -314,3 +297,34 @@
 .fld small { color: var(--ink-3); }
 .fld input::placeholder, .fld textarea::placeholder { color: #a3abb7; }
 .btn--dark:focus-visible { outline-color: rgba(37, 99, 235, 0.55); }
+
+
+/* ---------- polished cards and bars ---------- */
+:root { --bar: linear-gradient(90deg, #6f9bf2, #2563eb); --bar-track: #ebeff8; --shadow-card: 0 1px 2px rgba(13, 31, 74, .05), 0 6px 18px -12px rgba(13, 31, 74, .18); }
+
+.dbcard2 { display: grid; gap: 8px; align-content: start; padding: 16px; border: 1px solid #e3e8f2; border-radius: 16px; background: #fff; color: inherit; text-decoration: none; box-shadow: var(--shadow-card); transition: border-color .15s ease, box-shadow .2s ease, transform .2s ease; }
+.dbcard2:hover { border-color: #c4d3f5; box-shadow: 0 1px 2px rgba(13, 31, 74, .05), 0 16px 30px -16px rgba(37, 99, 235, .35); transform: translateY(-2px); }
+.dbcard2:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.45); outline-offset: 2px; }
+.dbcard2__top { display: flex; align-items: center; justify-content: space-between; }
+.dbcard2__ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: linear-gradient(145deg, #eaf0ff, #dbe6fb); color: var(--blue, #2563eb); }
+.dbcard2__go { color: #b4bcc8; transition: color .15s ease, transform .18s ease; }
+.dbcard2:hover .dbcard2__go { color: var(--blue, #2563eb); transform: translate(2px, -2px); }
+.dbcard2 h3 { margin: 4px 0 0; font-size: 15.5px; letter-spacing: -0.012em; line-height: 1.3; }
+.dbcard2__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip2 { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px; background: #f0f3f9; color: var(--ink-2); font-size: 11.5px; font-weight: 600; }
+.chip2 i { width: 6px; height: 6px; border-radius: 50%; background: #9aa4b2; }
+.chip2--good { background: #e9f7ee; color: #166534; } .chip2--good i { background: #16a34a; }
+.chip2--wait { background: #fff4df; color: #92580a; } .chip2--wait i { background: #e0a02a; }
+.dbcard2__foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--ink-3); font-size: 12px; }
+.dbcard2__foot b { color: var(--navy, #0d1f4a); font-variant-numeric: tabular-nums; }
+.dbcard2__foot .dbcard2__open { color: #b42318; }
+.dbcard2__bar { display: block; position: relative; height: 6px; border-radius: 6px; background: var(--bar-track); overflow: hidden; }
+.dbcard2__bar i { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--bar); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
+
+/* record header bar */
+.cbar__track { height: 6px; background: var(--bar-track); max-width: 280px; }
+.cbar__track i { background: var(--bar); border-radius: 6px; }
+
+/* other cards get the same soft depth */
+.panel, .post, .item, .dd-item, .dash__card, .cs__item, .tok { box-shadow: var(--shadow-card); border-color: #e3e8f2; }
+.item:hover { box-shadow: 0 1px 2px rgba(13, 31, 74, .05), 0 12px 24px -16px rgba(13, 31, 74, .3); }

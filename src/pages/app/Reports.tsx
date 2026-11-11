@@ -194,7 +194,7 @@ export default function Reports() {
                   track
                   items={r.scores.map(({ d, c }) => ({
                     label: d.name, to: `/app/databases/${d.id}`, value: c.pct, text: `${c.pct}%`,
-                    note: c.missing.length ? `Missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}` : 'Fully documented',
+                    note: c.missing.length ? `Missing ${c.missing.slice(0, 3).map((m) => m.label.toLowerCase().replace(/\s*\(.*\)/, '')).join(', ')}${c.missing.length > 3 ? ` and ${c.missing.length - 3} more` : ''}` : 'Fully documented',
                   }))}
                 />
               )}
