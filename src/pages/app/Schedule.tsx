@@ -4,6 +4,7 @@ import { describe, fmtDate, todayStr, unwrap, useLoad, useTeam } from '../../lib
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
 
 type Task = {
   id: string; title: string; notes: string; kind: 'task' | 'event'; assignee: string | null
@@ -14,6 +15,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const ymd = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`
 
 export default function Schedule() {
+  const { confirm } = useFeedback()
   const s = sectionByPath('schedule')
   const { team, name: who } = useTeam()
   const { data, error, loading, reload } = useLoad<Task[]>(async () =>
@@ -36,7 +38,7 @@ export default function Schedule() {
     } catch (e) { setMsg(describe(e)) }
   }
   async function remove(t: Task) {
-    if (!window.confirm(`Delete "${t.title}"?`)) return
+    if (!await confirm(`Delete "${t.title}"?`)) return
     try {
       unwrap(await supabase.from('tasks').delete().eq('id', t.id))
       reload()

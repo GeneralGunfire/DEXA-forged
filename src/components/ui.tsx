@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, type ReactNode } from 'react'
 import { SETUP, useSignedUrl } from '../lib/data'
+import { WaveBand } from './charts'
 import '../pages/app/pages.css'
 
 export function PageHead({ title, blurb, action }: { title: string; blurb?: string; action?: ReactNode }) {
@@ -16,8 +17,8 @@ export function PageHead({ title, blurb, action }: { title: string; blurb?: stri
 }
 
 export function Dialog({
-  open, onClose, title, children, wide,
-}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+  open, onClose, title, children, wide, size, subtitle,
+}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; size?: 'sm' | 'md'; subtitle?: string }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const d = ref.current
@@ -28,14 +29,19 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      className={`dlg${wide ? " dlg--wide" : ""}`}
+      className={`dlg${wide ? ' dlg--wide' : ''}${size === 'sm' ? ' dlg--sm' : ''}`}
+      aria-labelledby="dlg-title"
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose() }}
     >
       {open && (
         <div className="dlg__box">
+          <span className="dlg__grip" aria-hidden="true" />
           <header className="dlg__head">
-            <h2>{title}</h2>
+            <div>
+              <h2 id="dlg-title">{title}</h2>
+              {subtitle && <p>{subtitle}</p>}
+            </div>
             <button type="button" className="dlg__x" onClick={onClose} aria-label="Close">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
@@ -88,6 +94,7 @@ export function Skeleton() {
 export function EmptyState({ title, text, action }: { title: string; text?: string; action?: ReactNode }) {
   return (
     <div className="empty">
+      <WaveBand className="empty__wave" />
       <p>{title}</p>
       {text && <small>{text}</small>}
       {action}

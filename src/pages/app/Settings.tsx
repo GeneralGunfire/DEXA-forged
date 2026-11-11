@@ -6,6 +6,7 @@ import { EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
 import './pages.css'
 import './timeline.css'
+import { useFeedback } from '../../components/feedback'
 
 type Tok = { id: string; label: string; scope: string; created_at: string; last_used_at: string | null; revoked_at: string | null }
 
@@ -16,6 +17,7 @@ function newToken(prefix = 'fgl_') {
 }
 
 export default function Settings() {
+  const { confirm, toast } = useFeedback()
   const s = sectionByPath('settings')
   const { data, error, loading, reload } = useLoad<Tok[]>(async () =>
     unwrap<Tok[]>(await supabase.from('log_tokens').select('id, label, scope, created_at, last_used_at, revoked_at').order('created_at', { ascending: false })) ?? [])
@@ -41,12 +43,12 @@ export default function Settings() {
     } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
   async function revoke(t: Tok) {
-    if (!window.confirm(`Revoke "${t.label}"? Anything using it will stop being able to log. This cannot be undone.`)) return
-    try { unwrap(await supabase.from('log_tokens').update({ revoked_at: new Date().toISOString() }).eq('id', t.id)); reload() } catch (e) { setErr(describe(e)) }
+    if (!await confirm(`Revoke "${t.label}"? Anything using it will stop being able to log. This cannot be undone.`)) return
+    try { unwrap(await supabase.from('log_tokens').update({ revoked_at: new Date().toISOString() }).eq('id', t.id)); reload(); toast('Token revoked') } catch (e) { setErr(describe(e)) }
   }
   async function copy() {
     if (!fresh) return
-    try { await navigator.clipboard.writeText(fresh); setCopied(true) } catch { setShown(true) }
+    try { await navigator.clipboard.writeText(fresh); setCopied(true); toast('Token copied. Keep it somewhere safe.') } catch { setShown(true) }
   }
 
   return (

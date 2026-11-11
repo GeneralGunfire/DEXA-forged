@@ -6,6 +6,7 @@ import {
 import { Chip, Dialog, EmptyState, Field, LoadState, PageHead, Rich } from '../../components/ui'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
 
 export type Post = {
   id: string; title: string; body: string; image_paths: string[]; is_public: boolean
@@ -18,6 +19,7 @@ const dayOf = (iso: string) => {
 }
 
 export default function Messages() {
+  const { confirm } = useFeedback()
   const s = sectionByPath('messages')
   const { name: who } = useTeam()
   const { data, error, loading, reload } = useLoad<Post[]>(async () =>
@@ -27,7 +29,7 @@ export default function Messages() {
   const [msg, setMsg] = useState<string | null>(null)
 
   async function remove(p: Post) {
-    if (!window.confirm(`Delete "${p.title}"? This cannot be undone.`)) return
+    if (!await confirm(`Delete "${p.title}"? This cannot be undone.`)) return
     try {
       unwrap(await supabase.from('posts').delete().eq('id', p.id))
       await removePostImages(p.image_paths)

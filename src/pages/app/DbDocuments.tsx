@@ -10,6 +10,7 @@ import { Dialog, EmptyState, Field, LoadState } from '../../components/ui'
 import { DocViewer } from '../../components/DocViewer'
 import './pages.css'
 import './timeline.css'
+import { useFeedback } from '../../components/feedback'
 
 type Doc = {
   id: string; database_id: string; name: string; description: string; document_date: string
@@ -24,6 +25,7 @@ const fileName = (d: Doc) => `${d.name}.${ext(d)}`
 
 /** Documents tab of a database record. A replaced file stays as an "earlier copy", shown by date. */
 export function DbDocuments({ databaseId }: { databaseId: string }) {
+  const { confirm, toast } = useFeedback()
   const [params] = useSearchParams()
   const focus = params.get('doc')
   const { data, error, loading, reload } = useLoad<Doc[]>(async () =>
@@ -59,12 +61,12 @@ export function DbDocuments({ databaseId }: { databaseId: string }) {
   async function remove(d: Doc) {
     const chain = earlier(d)
     const extra = chain.length ? ` Its ${chain.length} earlier ${chain.length === 1 ? 'copy' : 'copies'} will be deleted too.` : ''
-    if (!window.confirm(`Delete "${d.name}"?${extra} This cannot be undone.`)) return
+    if (!await confirm(`Delete "${d.name}"?${extra} This cannot be undone.`)) return
     try {
       const rows = [d, ...chain]
       unwrap(await supabase.from('db_documents').delete().in('id', rows.map((r) => r.id)))
       await removeFiles(rows.map((r) => r.path))
-      setMsg(null); reload()
+      setMsg(null); reload(); toast('Document deleted')
     } catch (e) { setMsg(describe(e)) }
   }
 
@@ -139,7 +141,7 @@ export function DbDocuments({ databaseId }: { databaseId: string }) {
           <DocForm
             key={form === 'new' ? 'new' : `${form.doc?.id}${form.replace}`}
             databaseId={databaseId} doc={form === 'new' ? undefined : form.doc} replace={form !== 'new' && !!form.replace}
-            entries={entries.data ?? []} onClose={() => setForm(null)} onDone={reload}
+            entries={entries.data ?? []} onClose={() => setForm(null)} onDone={() => { reload(); toast('Document saved') }}
           />
         )}
       </Dialog>

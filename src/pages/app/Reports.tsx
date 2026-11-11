@@ -5,7 +5,7 @@ import { todayStr, unwrap, useLoad, useTeam } from '../../lib/data'
 import { completeness, countBy } from '../../lib/completeness'
 import { LoadState, PageHead } from '../../components/ui'
 import { Bar, Stars } from '../../components/viz'
-import { BarList, Columns, StatTiles, Takeaways, WaveBand } from '../../components/charts'
+import { BarList, Columns, StatTiles, Takeaways } from '../../components/charts'
 import { average } from './Feedback'
 import { sectionByPath } from './sections'
 import './pages.css'
@@ -153,8 +153,6 @@ export default function Reports() {
           </>
         }
       />
-
-      <WaveBand />
 
       <div className="bar noprint">
         <div className="seg" role="group" aria-label="Period">

@@ -147,10 +147,10 @@ const wave = Array.from({ length: 16 }, (_, i) => {
   return { d, stroke: `rgb(${lerp(199, 13, t)},${lerp(214, 31, t)},${lerp(251, 74, t)})` }
 })
 
-export function WaveBand() {
+export function WaveBand({ tone = 'navy', drift = false, className = '' }: { tone?: 'navy' | 'light'; drift?: boolean; className?: string }) {
   return (
-    <svg className="wave" viewBox="0 0 1200 64" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-      {wave.map((w, i) => <path key={i} d={w.d} stroke={w.stroke} fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
+    <svg className={`wave wave--${tone}${drift ? ' wave--drift' : ''} ${className}`} viewBox="0 0 1200 64" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <g>{wave.map((w, i) => <path key={i} d={w.d} stroke={tone === 'light' ? `rgba(255,255,255,${(0.18 + (i / 15) * 0.5).toFixed(2)})` : w.stroke} fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}</g>
     </svg>
   )
 }

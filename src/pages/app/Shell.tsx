@@ -7,6 +7,8 @@ import { fmtDate, postImageUrl, SETUP, todayStr, unwrap, useLoad } from '../../l
 import { plainExcerpt, SetupNotice } from '../../components/ui'
 import { SECTIONS } from './sections'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
+import { FeedbackProvider } from '../../components/feedback'
+import { WaveBand } from '../../components/charts'
 import Messages from './Messages'
 import { DatabaseBoard, DatabaseDetail } from './Databases'
 import Branding from './Branding'
@@ -78,6 +80,7 @@ function Home({ name }: { name: string }) {
             <Link className="wh__btn wh__btn--ghost" to="/app/schedule">Schedule</Link>
           </div>
         </div>
+        <WaveBand tone="light" drift className="wh__wave" />
         <button type="button" className="wh__scroll" onClick={scrollToNews}>
           News and dashboard
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
@@ -160,6 +163,14 @@ function Home({ name }: { name: string }) {
 
 /* ---------------- layout with the sidebar ---------------- */
 
+/** The sidebar, grouped by what each section is for. */
+const NAV = [
+  { label: 'Workspace', items: ['home', 'messages', 'schedule', 'documents'] },
+  { label: 'Databases', items: ['databases', 'timeline'] },
+  { label: 'Insight', items: ['reports', 'feedback'] },
+  { label: 'Admin', items: ['branding', 'settings'] },
+]
+
 function Layout({ display, email }: { display: string; email: string }) {
   const loc = useLocation()
   const linkClass = ({ isActive }: { isActive: boolean }) => `ws__link${isActive ? ' is-active' : ''}`
@@ -171,6 +182,7 @@ function Layout({ display, email }: { display: string; email: string }) {
   )
 
   return (
+    <FeedbackProvider>
     <div className="ws">
       <aside className="ws__side">
         <div className="ws__sidein">
@@ -179,10 +191,17 @@ function Layout({ display, email }: { display: string; email: string }) {
             <span>Forged</span>
           </Link>
 
-          <p className="ws__group">Workspace</p>
           <nav className="ws__nav" aria-label="Workspace">
-            {item('/app', 'Home', homeIcon, true)}
-            {SECTIONS.map((s) => item(`/app/${s.path}`, s.label, s.icon))}
+            {NAV.map((g) => (
+              <div className="ws__navgroup" key={g.label} role="group" aria-label={g.label}>
+                <p className="ws__group">{g.label}</p>
+                {g.items.map((k) => {
+                  if (k === 'home') return item('/app', 'Home', homeIcon, true)
+                  const s = SECTIONS.find((x) => x.path === k)
+                  return s ? item(`/app/${s.path}`, s.label, s.icon) : null
+                })}
+              </div>
+            ))}
           </nav>
 
           <div className="ws__user">
@@ -202,6 +221,7 @@ function Layout({ display, email }: { display: string; email: string }) {
         <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
     </div>
+    </FeedbackProvider>
   )
 }
 

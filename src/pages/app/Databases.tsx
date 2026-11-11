@@ -8,9 +8,10 @@ import { DocumentsPanel } from './Documents'
 import { DbDocuments } from './DbDocuments'
 import { TimelineView } from './Timeline'
 import { ContentSections } from '../../components/ContentSections'
-import { StatTiles, WaveBand } from '../../components/charts'
+import { StatTiles } from '../../components/charts'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
 
 type Db = {
   id: string; name: string; machine: string; db_type: string; port: string; instance_name: string
@@ -61,7 +62,6 @@ export function DatabaseBoard() {
   return (
     <div className="pg">
       <PageHead title={s.label} blurb={s.blurb} action={<button type="button" className="btn btn--dark" onClick={() => setAdding(true)}>New database</button>} />
-      <WaveBand />
       <LoadState loading={loading && !data} error={error}>
         {data && data.length > 0 && counts.data && (() => {
           const tl = Object.values(counts.data.tl)
@@ -179,6 +179,7 @@ const TABS = ['Timeline', 'Documents', 'Background', 'Build record', 'Developmen
 type Tab = (typeof TABS)[number]
 
 export function DatabaseDetail() {
+  const { confirm } = useFeedback()
   const { id = '' } = useParams()
   const nav = useNavigate()
   const { data, error, loading, reload } = useLoad<Db | null>(async () =>
@@ -191,7 +192,7 @@ export function DatabaseDetail() {
   const [msg, setMsg] = useState<string | null>(null)
 
   async function remove(d: Db) {
-    if (!window.confirm(`Delete "${d.name}" and all of its log entries and documents? This cannot be undone.`)) return
+    if (!await confirm(`Delete "${d.name}" and all of its log entries and documents? This cannot be undone.`)) return
     try {
       const docs = unwrap<{ path: string }[]>(await supabase.from('documents').select('path').eq('database_id', d.id)) ?? []
       unwrap(await supabase.from('databases').delete().eq('id', d.id))
@@ -392,6 +393,7 @@ type Entry = { id: string; database_id: string; title: string; body: string; ent
 type TlItem = { id: string; type: string; author: string; title: string; summary: string; happened_at: string; status: string | null }
 
 function LogPanel({ databaseId }: { databaseId: string }) {
+  const { confirm } = useFeedback()
   const { data, error, loading, reload } = useLoad<Entry[]>(async () =>
     unwrap<Entry[]>(await supabase.from('db_entries').select('*').eq('database_id', databaseId)
       .order('entry_date', { ascending: false }).order('created_at', { ascending: false })) ?? [], [databaseId])
@@ -408,7 +410,7 @@ function LogPanel({ databaseId }: { databaseId: string }) {
   ].sort((a, b) => b.at.localeCompare(a.at))
 
   async function remove(en: Entry) {
-    if (!window.confirm(`Delete "${en.title}"?`)) return
+    if (!await confirm(`Delete "${en.title}"?`)) return
     try { unwrap(await supabase.from('db_entries').delete().eq('id', en.id)); reload() } catch (e) { setMsg(describe(e)) }
   }
 

@@ -9,10 +9,11 @@ import {
 } from '../../lib/timeline'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { ContentSections } from '../../components/ContentSections'
-import { Columns, StatTiles, WaveBand } from '../../components/charts'
+import { Columns, StatTiles } from '../../components/charts'
 import { sectionByPath } from './sections'
 import './pages.css'
 import './timeline.css'
+import { useFeedback } from '../../components/feedback'
 
 export type DbLite = { id: string; name: string; slug: string | null }
 type DocLink = { id: string; name: string; entry_id: string; database_id: string }
@@ -26,7 +27,6 @@ export default function GlobalTimeline() {
   return (
     <div className="pg pg--wide">
       <PageHead title={s.label} blurb={s.blurb} />
-      <WaveBand />
       <ContentSections databaseId={null} area="estate" />
       <TimelineView />
     </div>
@@ -48,6 +48,7 @@ const ago = (iso: string) => {
 }
 
 export function TimelineView({ databaseId }: { databaseId?: string }) {
+  const { confirm, toast } = useFeedback()
   const me = useMe()
   const [params, setParams] = useSearchParams()
   const focus = params.get('entry')
@@ -129,11 +130,11 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
   async function remove(en: Entry) {
     const kids = all.filter((x) => x.parent_id === en.id).length
     const extra = kids ? ` Its ${kids} linked ${kids === 1 ? 'entry stays' : 'entries stay'} on the timeline.` : ''
-    if (!window.confirm(`Delete "${en.title}"? This cannot be undone.${extra}`)) return
-    try { unwrap(await supabase.from('timeline_entries').delete().eq('id', en.id)); setMsg(null); reloadAll() } catch (e) { setMsg(describe(e)) }
+    if (!await confirm(`Delete "${en.title}"? This cannot be undone.${extra}`)) return
+    try { unwrap(await supabase.from('timeline_entries').delete().eq('id', en.id)); setMsg(null); reloadAll(); toast('Entry deleted') } catch (e) { setMsg(describe(e)); toast(describe(e), 'err') }
   }
   async function setStatus(en: Entry, status: 'Open' | 'Resolved') {
-    try { unwrap(await supabase.from('timeline_entries').update({ status }).eq('id', en.id)); setMsg(null); entries.reload() } catch (e) { setMsg(describe(e)) }
+    try { unwrap(await supabase.from('timeline_entries').update({ status }).eq('id', en.id)); setMsg(null); entries.reload(); toast(status === 'Resolved' ? 'Marked as resolved' : 'Reopened') } catch (e) { setMsg(describe(e)); toast(describe(e), 'err') }
   }
 
   const row = (n: TNode, depth: number): React.ReactNode => (
@@ -264,7 +265,7 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
             key={editing.entry?.id ?? JSON.stringify(editing.preset ?? {})}
             entry={editing.entry} preset={editing.preset} fixedDb={databaseId} me={me}
             dbs={dbs.data ?? []} entries={all}
-            onClose={() => setEditing(null)} onDone={reloadAll}
+            onClose={() => setEditing(null)} onDone={() => { reloadAll(); toast('Entry saved') }}
           />
         )}
       </Dialog>

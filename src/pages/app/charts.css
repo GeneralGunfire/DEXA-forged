@@ -78,7 +78,14 @@ button.co__c { cursor: pointer; }
 .tk li { position: relative; padding-left: 20px; font-size: 14px; line-height: 1.55; }
 .tk li::before { content: ''; position: absolute; left: 2px; top: 8px; width: 7px; height: 7px; border-radius: 50%; background: #5b8def; }
 
-/* wave band under a page header */
-.wave { display: block; width: 100%; height: 60px; margin: -6px 0 14px; opacity: .9; -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); }
-@media (max-width: 560px) { .wave { height: 30px; } }
-@media print { .wave { display: none; } }
+/* the flowing line motif: a slow drift in the Home hero, a quiet accent in empty states */
+.wave { display: block; width: 100%; height: 60px; -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent); }
+.wave--drift { width: 130%; margin-left: -15%; }
+.wave--drift g { animation: waveDrift 26s ease-in-out infinite alternate; }
+@keyframes waveDrift { from { transform: translateX(-4%) scaleY(1); } to { transform: translateX(4%) scaleY(1.35); } }
+.wh { overflow: hidden; }
+.wh__wave.wave--drift { width: 100%; margin-left: 0; }
+.wh__wave { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; pointer-events: none; }
+.empty__wave { width: min(360px, 80%); height: 34px; margin-bottom: 4px; opacity: .8; }
+@media (prefers-reduced-motion: reduce) { .wave--drift g { animation: none; } }
+@media print { .wave, .wh__wave { display: none; } }

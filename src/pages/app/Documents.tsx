@@ -8,6 +8,7 @@ import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components
 import { DocViewer } from '../../components/DocViewer'
 import { sectionByPath } from './sections'
 import './pages.css'
+import { useFeedback } from '../../components/feedback'
 
 export type DocRow = {
   id: string; name: string; path: string; mime: string | null; size: number | null
@@ -18,6 +19,7 @@ const stripExt = (n: string) => n.replace(/\.[^.]+$/, '')
 
 /** Used by the Documents page (databaseId = null) and by each database's Documents tab. */
 export function DocumentsPanel({ databaseId = null }: { databaseId?: string | null }) {
+  const { confirm } = useFeedback()
   const { name: who } = useTeam()
   const { data, error, loading, reload } = useLoad<DocRow[]>(async () => {
     let q = supabase.from('documents').select('*').order('created_at', { ascending: false })
@@ -41,7 +43,7 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
     try { await downloadFile(d.path, d.name) } catch (e) { setMsg(describe(e)) }
   }
   async function remove(d: DocRow) {
-    if (!window.confirm(`Delete "${d.name}"? This cannot be undone.`)) return
+    if (!await confirm(`Delete "${d.name}"? This cannot be undone.`)) return
     try {
       unwrap(await supabase.from('documents').delete().eq('id', d.id))
       await removeFiles([d.path])

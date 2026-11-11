@@ -64,19 +64,36 @@
 .check input { width: 16px; height: 16px; accent-color: var(--ink); }
 .formerr { margin: 0 0 12px; color: #b42318; font-size: 13px; }
 
-/* ---------- dialog ---------- */
-.dlg { width: min(520px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); padding: 0; border: 0; border-radius: 16px; background: #fff; color: var(--ink); box-shadow: 0 40px 100px -30px rgba(6, 20, 64, 0.5); }
-.dlg::backdrop { background: rgba(11, 13, 18, 0.42); }
-.dlg[open] { animation: dlgIn .2s ease; }
-@keyframes dlgIn { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+/* ---------- dialog (centred on desktop, a bottom sheet on phones) ---------- */
+.dlg { width: min(540px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); padding: 0; border: 0; border-radius: 18px; background: #fff; color: var(--ink); box-shadow: 0 0 0 1px rgba(11, 13, 18, .06), 0 40px 100px -30px rgba(6, 20, 64, 0.55); overflow: hidden; }
+.dlg--sm { width: min(430px, calc(100vw - 28px)); }
+.dlg::backdrop { background: rgba(13, 31, 74, 0.38); backdrop-filter: blur(3px); }
+.dlg[open] { animation: dlgIn .2s cubic-bezier(.2, .7, .2, 1); }
+.dlg[open]::backdrop { animation: dlgFade .2s ease; }
+@keyframes dlgIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes dlgFade { from { opacity: 0; } to { opacity: 1; } }
 .dlg__box { display: flex; flex-direction: column; max-height: calc(100dvh - 40px); }
-.dlg__head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 12px; }
-.dlg__head h2 { margin: 0; font-size: 16px; letter-spacing: -0.01em; }
-.dlg__x { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); display: grid; place-items: center; cursor: pointer; }
-.dlg__x:hover { background: #eef1f5; }
-.dlg form, .dlg__body { padding: 4px 18px 18px; overflow-y: auto; }
-.dlg__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
-@media (prefers-reduced-motion: reduce) { .dlg[open], .pg { animation: none; } }
+.dlg__grip { display: none; }
+.dlg__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; }
+.dlg__head h2 { margin: 0; font-size: 17px; letter-spacing: -0.015em; line-height: 1.3; }
+.dlg__head p { margin: 4px 0 0; color: var(--ink-3); font-size: 13px; line-height: 1.45; }
+.dlg__x { flex: none; width: 32px; height: 32px; margin: -4px -6px 0 0; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); display: grid; place-items: center; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.dlg__x:hover { background: #eef1f5; color: var(--ink); }
+.dlg__x:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.45); outline-offset: 1px; }
+.dlg form, .dlg__body { padding: 2px 20px 20px; overflow-y: auto; }
+.dlg__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+@media (max-width: 560px) {
+  .dlg { width: 100vw; max-width: 100vw; max-height: 92dvh; margin: auto 0 0; border-radius: 20px 20px 0 0; }
+  .dlg[open] { animation: sheetIn .26s cubic-bezier(.2, .7, .2, 1); }
+  .dlg__box { max-height: 92dvh; }
+  .dlg__grip { display: block; width: 38px; height: 4px; margin: 8px auto 0; border-radius: 4px; background: #d5dbe4; }
+  .dlg__head { padding-top: 12px; }
+  .dlg__foot { position: sticky; bottom: 0; margin: 12px -20px -20px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #eef1f5; }
+  .dlg__foot .btn { flex: 1; height: 42px; }
+  .cf .dlg__foot { margin: 8px -20px -20px; }
+}
+@keyframes sheetIn { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dlg[open], .dlg[open]::backdrop, .pg { animation: none; } }
 
 /* ---------- list rows (documents, tasks, entries) ---------- */
 .rows { display: grid; gap: 8px; }
@@ -290,3 +307,10 @@
 .skel i { display: block; height: 14px; border-radius: 6px; background: linear-gradient(90deg, #eef1f5, #f6f8fb, #eef1f5); background-size: 200% 100%; animation: skel 1.4s ease-in-out infinite; }
 @keyframes skel { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skel i { animation: none; } }
+
+/* ---------- form controls ---------- */
+.fld select { appearance: none; -webkit-appearance: none; padding-right: 34px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%234b5563' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.fld > span { color: var(--ink); }
+.fld small { color: var(--ink-3); }
+.fld input::placeholder, .fld textarea::placeholder { color: #a3abb7; }
+.btn--dark:focus-visible { outline-color: rgba(37, 99, 235, 0.55); }
