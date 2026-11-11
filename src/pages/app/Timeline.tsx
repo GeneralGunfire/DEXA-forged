@@ -4,8 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { describe, unwrap, useLoad, useMe, useTeam } from '../../lib/data'
 import { checkRedaction } from '../../lib/redact'
 import {
-  activeFilterCount, AUTHORS, buildThreads, countNodes, filterEntries, fixesFor, fmtDay, fmtTime, fromLocalInput, NO_FILTERS,
-  PHASES, STATUSES, toLocalInput, TYPES, type Entry, type EntryType, type Filters, type Node,
+  activeFilterCount, AUTHORS, buildThreads, countNodes, dayKey, filterEntries, fixesFor, fmtDay, fmtTime, fromLocalInput, NO_FILTERS,
+  PHASES, STATUSES, toLocalInput, TYPES, type Entry, type EntryType, type Filters, type Node as TNode,
 } from '../../lib/timeline'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
@@ -32,9 +32,32 @@ export default function GlobalTimeline() {
 
 /* ---------------- the timeline itself (one database, or everything) ---------------- */
 
+const ICON: Record<string, string> = {
+  Action: 'M8 5v14l11-7z',
+  Error: 'M12 7v6M12 17h.01',
+  Response: 'M9 14l-5-4 5-4M4 10h10a6 6 0 0 1 6 6v2',
+  Fix: 'M5 12l5 5 9-10',
+  Decision: 'M12 4l8 8-8 8-8-8z',
+  Note: 'M6 7h12M6 12h12M6 17h7',
+}
+function Dot({ type, open }: { type: string; open?: boolean }) {
+  return (
+    <span className={`tl-node-dot tl-node-dot--${type.toLowerCase()}${open ? ' is-open' : ''}`} aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill={type === 'Action' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d={ICON[type] ?? ICON.Note} /></svg>
+    </span>
+  )
+}
+
+const ago = (iso: string) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m} min ago`
+  if (m < 1440) return `${Math.round(m / 60)} h ago`
+  return `${Math.round(m / 1440)} d ago`
+}
+
 export function TimelineView({ databaseId }: { databaseId?: string }) {
   const me = useMe()
-  const { name: who } = useTeam()
   const [params, setParams] = useSearchParams()
   const focus = params.get('entry')
 
@@ -51,10 +74,19 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
     return unwrap<DocLink[]>(await q) ?? []
   }, [databaseId])
 
+  // Claude Code logs while it works, so new entries appear without a reload
+  const { reload: reloadEntries } = entries
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') reloadEntries() }, 20000)
+    return () => clearInterval(t)
+  }, [reloadEntries])
+
   const [filters, setFilters] = useState<Filters>({ ...NO_FILTERS, database: databaseId ?? '' })
   const [showFilters, setShowFilters] = useState(false)
   const [editing, setEditing] = useState<{ entry?: Entry; preset?: Partial<Entry> } | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  const [activeDay, setActiveDay] = useState('')
 
   const dbName = (id: string | null) => (id ? dbs.data?.find((d) => d.id === id)?.name ?? 'Database' : 'Whole estate')
   const all = entries.data ?? []
@@ -62,21 +94,48 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
   const groups = useMemo(() => buildThreads(shown), [shown])
   const filtered = activeFilterCount(filters, !!databaseId) > 0
   const set = (k: keyof Filters, v: string) => setFilters((f) => ({ ...f, [k]: v }))
+  const toggle = (id: string) => setOpenIds((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+
+  const openErrors = all.filter((e) => e.type === 'Error' && e.status === 'Open').length
+  const fromClaude = all.filter((e) => e.author === 'Claude Code').length
+  const last = all.find((e) => e.author === 'Claude Code')
+
+  // scrubber: one bar per day, stacked by type
+  const days = useMemo(() => {
+    const m = new Map<string, Record<string, number>>()
+    for (const e of shown) { const d = dayKey(e.happened_at); const r = m.get(d) ?? {}; r[e.type] = (r[e.type] ?? 0) + 1; m.set(d, r) }
+    return [...m.entries()].sort((x, y) => x[0].localeCompare(y[0])).slice(-60)
+  }, [shown])
+  const peak = Math.max(1, ...days.map(([, r]) => Object.values(r).reduce((a, b) => a + b, 0)))
+
+  useEffect(() => {
+    const els = [...document.querySelectorAll<HTMLElement>('[data-day]')]
+    if (!els.length) return
+    const io = new IntersectionObserver((ee) => {
+      const hit = ee.filter((x) => x.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+      if (hit) setActiveDay((hit.target as HTMLElement).dataset.day ?? '')
+    }, { rootMargin: '-10% 0px -75% 0px' })
+    els.forEach((e) => io.observe(e))
+    return () => io.disconnect()
+  }, [groups])
+
+  const jumpDay = (d: string) => document.getElementById(`day-${d}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   // open the entry a link points at
   useEffect(() => {
     if (!focus || entries.loading) return
-    const el = document.getElementById(`e-${focus}`)
-    if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('is-flash'); const t = setTimeout(() => el.classList.remove('is-flash'), 2400); return () => clearTimeout(t) }
-  }, [focus, entries.loading, groups])
+    setOpenIds((s) => new Set(s).add(focus))
+    const t0 = setTimeout(() => {
+      const el = document.getElementById(`e-${focus}`)
+      if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('is-flash'); setTimeout(() => el.classList.remove('is-flash'), 2400) }
+    }, 60)
+    return () => clearTimeout(t0)
+  }, [focus, entries.loading])
   useEffect(() => {
-    if (!focus) return
-    const el = document.getElementById(`e-${focus}`)
-    if (!el && !entries.loading && all.length && filtered) setFilters({ ...NO_FILTERS, database: databaseId ?? '' })
-  }, [focus, entries.loading, all.length, filtered, databaseId])
+    if (focus && !entries.loading && all.length && filtered && !shown.some((e) => e.id === focus)) setFilters({ ...NO_FILTERS, database: databaseId ?? '' })
+  }, [focus, entries.loading, all.length, filtered, shown, databaseId])
 
-  async function reloadAll() { entries.reload(); docs.reload() }
-
+  function reloadAll() { entries.reload(); docs.reload() }
   async function remove(en: Entry) {
     const kids = all.filter((x) => x.parent_id === en.id).length
     const extra = kids ? ` Its ${kids} linked ${kids === 1 ? 'entry stays' : 'entries stay'} on the timeline.` : ''
@@ -87,29 +146,71 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
     try { unwrap(await supabase.from('timeline_entries').update({ status }).eq('id', en.id)); setMsg(null); entries.reload() } catch (e) { setMsg(describe(e)) }
   }
 
-  const card = (n: Node, depth: number) => (
-    <EntryCard
-      key={n.entry.id} node={n} depth={depth} all={all} docs={docs.data ?? []} who={who}
-      dbName={databaseId ? null : dbName(n.entry.database_id)}
-      dbId={n.entry.database_id}
-      onEdit={(entry) => setEditing({ entry })}
-      onDelete={remove}
+  const row = (n: TNode, depth: number): React.ReactNode => (
+    <TlRow
+      key={n.entry.id} node={n} depth={depth} all={all} docs={docs.data ?? []}
+      dbName={databaseId ? null : dbName(n.entry.database_id)} dbId={n.entry.database_id}
+      open={openIds.has(n.entry.id)} onToggle={toggle}
+      onEdit={(entry) => setEditing({ entry })} onDelete={remove}
       onReply={(parent, type) => setEditing({ preset: { parent_id: parent.id, type, database_id: parent.database_id, phase: parent.phase } })}
       onStatus={setStatus}
-      render={card}
+      render={row}
       onJump={(id) => setParams((p) => { p.set('entry', id); return p }, { replace: true })}
     />
   )
 
+  const filterCount = activeFilterCount(filters, !!databaseId) - (filters.q ? 1 : 0)
   return (
     <>
+      <section className="tl-head" aria-label="Timeline summary">
+        <span className="tl-live" aria-hidden="true" />
+        <div>
+          <strong>Claude Code keeps this timeline up to date as it works.</strong>
+          <p>
+            {last ? `Last logged ${ago(last.happened_at)}.` : 'Nothing logged by Claude Code yet.'}{' '}
+            {fromClaude} of {all.length} {all.length === 1 ? 'entry' : 'entries'} came from Claude Code
+            {openErrors > 0 ? `, and ${openErrors} ${openErrors === 1 ? 'error is' : 'errors are'} still open.` : '.'}
+          </p>
+        </div>
+      </section>
+
+      {days.length > 1 && (
+        <div className="tl-scrub" role="group" aria-label="Activity by day. Choose a day to jump to it.">
+          {days.map(([d, r]) => {
+            const total = Object.values(r).reduce((a, b) => a + b, 0)
+            return (
+              <button type="button" key={d} className={`tl-scrub__bar${d === activeDay ? ' is-on' : ''}`} onClick={() => jumpDay(d)}
+                title={`${fmtDay(d)}: ${total} ${total === 1 ? 'entry' : 'entries'}`} aria-label={`${fmtDay(d)}, ${total} ${total === 1 ? 'entry' : 'entries'}`}>
+                <span style={{ height: `${Math.max(14, (total / peak) * 100)}%` }}>
+                  {TYPES.filter((t) => r[t]).map((t) => <i key={t} className={`tl-seg tl-seg--${t.toLowerCase()}`} style={{ flexGrow: r[t] }} />)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <div className="tl-bar">
         <input className="search tl-search" type="search" placeholder="Search entries" aria-label="Search the timeline"
           value={filters.q} onChange={(e) => set('q', e.target.value)} />
+        <div className="seg" role="group" aria-label="Who logged it">
+          {([['', 'Everyone'], ['Claude Code', 'Claude Code'], ['team', 'Team']] as const).map(([v, l]) => (
+            <button type="button" key={l} aria-pressed={filters.author === v} onClick={() => set('author', v)}>{l}</button>
+          ))}
+        </div>
         <button type="button" className="btn tl-filterbtn" aria-expanded={showFilters} onClick={() => setShowFilters((v) => !v)}>
-          Filters{activeFilterCount(filters, !!databaseId) - (filters.q ? 1 : 0) > 0 ? ` (${activeFilterCount(filters, !!databaseId) - (filters.q ? 1 : 0)})` : ''}
+          Filters{filterCount > 0 ? ` (${filterCount})` : ''}
         </button>
-        <button type="button" className="btn btn--dark" onClick={() => setEditing({})}>New entry</button>
+        <button type="button" className="btn" onClick={() => setEditing({})}>Add manual entry</button>
+      </div>
+
+      <div className="tl-legend" role="group" aria-label="Filter by type">
+        {TYPES.map((t) => (
+          <button type="button" key={t} className={`tl-legend__b${filters.type === t ? ' is-on' : ''}`} aria-pressed={filters.type === t}
+            onClick={() => set('type', filters.type === t ? '' : t)}>
+            <Dot type={t} />{t}
+          </button>
+        ))}
       </div>
 
       <div className={`tl-filters${showFilters ? ' is-open' : ''}`}>
@@ -122,11 +223,6 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
             </select>
           </label>
         )}
-        <label><span>Type</span>
-          <select value={filters.type} onChange={(e) => set('type', e.target.value)}>
-            <option value="">All types</option>{TYPES.map((t) => <option key={t}>{t}</option>)}
-          </select>
-        </label>
         <label><span>Phase</span>
           <select value={filters.phase} onChange={(e) => set('phase', e.target.value)}>
             <option value="">All phases</option>{PHASES.map((p) => <option key={p} value={p}>{p === 'Other' ? 'Other' : `Phase ${p}`}</option>)}
@@ -137,17 +233,15 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
             <option value="">Any status</option>{STATUSES.map((t) => <option key={t}>{t}</option>)}
           </select>
         </label>
-        <label><span>Author</span>
-          <select value={filters.author} onChange={(e) => set('author', e.target.value)}>
+        <label><span>Person</span>
+          <select value={(AUTHORS as readonly string[]).includes(filters.author) ? filters.author : ''} onChange={(e) => set('author', e.target.value)}>
             <option value="">Anyone</option>{AUTHORS.map((t) => <option key={t}>{t}</option>)}
           </select>
         </label>
         <label><span>From</span><input type="date" value={filters.from} onChange={(e) => set('from', e.target.value)} /></label>
         <label><span>To</span><input type="date" value={filters.to} onChange={(e) => set('to', e.target.value)} /></label>
-        {filtered && (
-          <button type="button" className="btn btn--sm tl-clear" onClick={() => setFilters({ ...NO_FILTERS, database: databaseId ?? '' })}>Clear filters</button>
-        )}
       </div>
+      {filtered && <button type="button" className="btn btn--sm tl-clear" onClick={() => setFilters({ ...NO_FILTERS, database: databaseId ?? '' })}>Clear filters</button>}
 
       {msg && <p className="notice notice--err" role="alert">{msg}</p>}
 
@@ -155,8 +249,8 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
         {all.length === 0 ? (
           <EmptyState
             title={databaseId ? 'Nothing has been logged for this database yet.' : 'Nothing has been logged yet.'}
-            text="Add an entry for each action, error, fix or decision."
-            action={<button type="button" className="btn btn--dark" onClick={() => setEditing({})}>New entry</button>}
+            text="Claude Code adds entries here as it works. You can also add one by hand."
+            action={<button type="button" className="btn btn--dark" onClick={() => setEditing({})}>Add manual entry</button>}
           />
         ) : groups.length === 0 ? (
           <EmptyState title="No entries match these filters." text="Clear a filter or change the search." />
@@ -165,12 +259,15 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
             <p className="tl-count" aria-live="polite">
               {countNodes(groups)} {countNodes(groups) === 1 ? 'entry' : 'entries'}{filtered ? ` of ${all.length}` : ''}, newest first
             </p>
-            {groups.map((g) => (
-              <section className="tl-day" key={g.day} aria-label={fmtDay(g.day)}>
-                <h2 className="tl-day__h">{fmtDay(g.day)}</h2>
-                <div className="tl-day__list">{g.nodes.map((n) => card(n, 0))}</div>
-              </section>
-            ))}
+            <div className="tl-spine">
+              {groups.map((g) => (
+                <section className="tl-day" key={g.day} id={`day-${g.day}`} data-day={g.day} aria-label={fmtDay(g.day)}>
+                  <h2 className="tl-day__h"><span>{fmtDay(g.day)}</span></h2>
+                  <div className="tl-rows">{g.nodes.map((n) => row(n, 0))}</div>
+                </section>
+              ))}
+              <p className="tl-end">Start of the record</p>
+            </div>
           </>
         )}
       </LoadState>
@@ -190,102 +287,100 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
   )
 }
 
-/* ---------------- one entry ---------------- */
+/* ---------------- one entry on the spine ---------------- */
 
-function EntryCard({
-  node, depth, all, docs, who, dbName, dbId, onEdit, onDelete, onReply, onStatus, onJump, render,
+function TlRow({
+  node, depth, all, docs, dbName, dbId, open, onToggle, onEdit, onDelete, onReply, onStatus, onJump, render,
 }: {
-  node: Node; depth: number; all: Entry[]; docs: DocLink[]; who: (id?: string | null) => string
-  dbName: string | null; dbId: string | null
+  node: TNode; depth: number; all: Entry[]; docs: DocLink[]
+  dbName: string | null; dbId: string | null; open: boolean
+  onToggle: (id: string) => void
   onEdit: (e: Entry) => void; onDelete: (e: Entry) => void
   onReply: (parent: Entry, type: EntryType) => void
   onStatus: (e: Entry, s: 'Open' | 'Resolved') => void
   onJump: (id: string) => void
-  render: (n: Node, depth: number) => React.ReactNode
+  render: (n: TNode, depth: number) => React.ReactNode
 }) {
   const e = node.entry
   const fixes = e.type === 'Error' ? fixesFor(e.id, all) : []
   const linked = docs.filter((d) => d.entry_id === e.id)
-  const [open, setOpen] = useState(false)
   const [hist, setHist] = useState(false)
-  void who
+  const robot = e.author === 'Claude Code'
 
   return (
-    <div className={`tl-node${depth ? ' tl-node--child' : ''}`}>
-      <article className={`tl-card tl-card--${e.type.toLowerCase()}`} id={`e-${e.id}`}>
-        <header className="tl-card__top">
-          <span className={typeClass(e.type)}>{e.type}</span>
-          {e.type === 'Error' && e.status && (
-            <span className={`tl-status tl-status--${e.status.toLowerCase()}`}>{e.status}</span>
+    <div className={`tl-item${depth ? ' tl-item--child' : ''}`}>
+      <div className={`tl-row tl-row--${e.type.toLowerCase()}${open ? ' is-open' : ''}`} id={`e-${e.id}`}>
+        <time className="tl-time" dateTime={e.happened_at}>{fmtTime(e.happened_at)}</time>
+        <Dot type={e.type} open={e.type === 'Error' && e.status === 'Open'} />
+        <div className="tl-body">
+          <button type="button" className="tl-head-btn" aria-expanded={open} onClick={() => onToggle(e.id)}>
+            <span className="tl-line1">
+              <span className={typeClass(e.type)}>{e.type}</span>
+              {e.type === 'Error' && e.status && <span className={`tl-status tl-status--${e.status.toLowerCase()}`}>{e.status}</span>}
+              <span className={`tl-by${robot ? ' tl-by--cc' : ''}`}>{e.author}</span>
+              {dbName !== null && <span className="tl-dbtag">{dbName}</span>}
+              <span className="tl-phase">{/^[12]$/.test(e.phase) ? `Phase ${e.phase}` : e.phase}</span>
+            </span>
+            <span className="tl-title">{e.title}</span>
+            {e.summary && <span className={`tl-sum${open ? '' : ' is-clamped'}`}>{e.summary}</span>}
+          </button>
+
+          {e.type === 'Error' && fixes.length > 0 && (
+            <p className="tl-resolved">
+              Resolved by{' '}
+              {fixes.map((f, i) => (
+                <span key={f.id}>{i > 0 && ', '}<a href={`#e-${f.id}`} onClick={(ev) => { ev.preventDefault(); onJump(f.id) }}>{f.title}</a></span>
+              ))}
+            </p>
           )}
-          {dbName !== null && (
-            dbId ? <Link className="tl-dbchip" to={`/app/databases/${dbId}?tab=Timeline`}>{dbName}</Link>
-              : <span className="tl-dbchip tl-dbchip--estate">{dbName}</span>
+
+          {open && (
+            <div className="tl-more">
+              {e.parent_id && depth === 0 && (
+                <p className="tl-resolved">
+                  In reply to{' '}
+                  <a href={`#e-${e.parent_id}`} onClick={(ev) => { ev.preventDefault(); onJump(e.parent_id!) }}>
+                    {all.find((x) => x.id === e.parent_id)?.title ?? 'an earlier entry'}
+                  </a>
+                </p>
+              )}
+              {linked.length > 0 && (
+                <p className="tl-docs">
+                  Documents:{' '}
+                  {linked.map((d, i) => (
+                    <span key={d.id}>{i > 0 && ', '}<Link to={`/app/databases/${d.database_id}?tab=Documents&doc=${d.id}`}>{d.name}</Link></span>
+                  ))}
+                </p>
+              )}
+              {e.detail && <pre className="tl-detail">{e.detail}</pre>}
+              <p className="tl-foot">
+                {new Date(e.happened_at).toLocaleString('en-ZA', { dateStyle: 'long', timeStyle: 'short' })}
+                {e.session_label ? ` · ${e.session_label}` : ''}{e.created_via === 'ingest' ? ' · logged automatically' : ' · added by hand'}
+                {dbId && dbName !== null && <> · <Link to={`/app/databases/${dbId}?tab=Timeline`}>Open {dbName}</Link></>}
+              </p>
+              <div className="tl-acts">
+                {e.type === 'Error' && (
+                  <>
+                    <button type="button" className="btn btn--sm" onClick={() => onReply(e, 'Response')}>Add response</button>
+                    <button type="button" className="btn btn--sm" onClick={() => onReply(e, 'Fix')}>Add fix</button>
+                    {e.status === 'Open'
+                      ? <button type="button" className="btn btn--sm" onClick={() => onStatus(e, 'Resolved')}>Mark resolved</button>
+                      : <button type="button" className="btn btn--sm" onClick={() => onStatus(e, 'Open')}>Reopen</button>}
+                  </>
+                )}
+                <span className="tl-acts__gap" />
+                <button type="button" className="btn btn--sm" onClick={() => setHist(!hist)} aria-expanded={hist}>History</button>
+                <button type="button" className="btn btn--sm" onClick={() => onEdit(e)}>Edit</button>
+                <button type="button" className="btn btn--sm btn--danger" onClick={() => onDelete(e)}>Delete</button>
+              </div>
+              {hist && <History entryId={e.id} />}
+            </div>
           )}
-          <span className="tl-meta">
-            <time dateTime={e.happened_at}>{fmtTime(e.happened_at)}</time> · {e.author} · {/^[12]$/.test(e.phase) ? `Phase ${e.phase}` : e.phase}
-            {e.created_via === 'ingest' ? ' · logged automatically' : ''}
-          </span>
-        </header>
-
-        <h3 className="tl-card__title">{e.title}</h3>
-        {e.summary && <p className="tl-card__sum">{e.summary}</p>}
-
-        {e.type === 'Error' && fixes.length > 0 && (
-          <p className="tl-resolved">
-            Resolved by{' '}
-            {fixes.map((f, i) => (
-              <span key={f.id}>{i > 0 && ', '}<a href={`#e-${f.id}`} onClick={(ev) => { ev.preventDefault(); onJump(f.id) }}>{f.title}</a></span>
-            ))}
-          </p>
-        )}
-        {e.parent_id && depth === 0 && (
-          <p className="tl-resolved">
-            In reply to{' '}
-            <a href={`#e-${e.parent_id}`} onClick={(ev) => { ev.preventDefault(); onJump(e.parent_id!) }}>
-              {all.find((x) => x.id === e.parent_id)?.title ?? 'an earlier entry'}
-            </a>
-          </p>
-        )}
-
-        {linked.length > 0 && (
-          <p className="tl-docs">
-            Documents:{' '}
-            {linked.map((d, i) => (
-              <span key={d.id}>{i > 0 && ', '}<Link to={`/app/databases/${d.database_id}?tab=Documents&doc=${d.id}`}>{d.name}</Link></span>
-            ))}
-          </p>
-        )}
-
-        {e.detail && (
-          <>
-            <button type="button" className="tl-link" aria-expanded={open} onClick={() => setOpen(!open)}>
-              {open ? 'Hide technical detail' : 'Show technical detail'}
-            </button>
-            {open && <pre className="tl-detail">{e.detail}</pre>}
-          </>
-        )}
-
-        <footer className="tl-acts">
-          {e.type === 'Error' && (
-            <>
-              <button type="button" className="btn btn--sm" onClick={() => onReply(e, 'Response')}>Add response</button>
-              <button type="button" className="btn btn--sm" onClick={() => onReply(e, 'Fix')}>Add fix</button>
-              {e.status === 'Open'
-                ? <button type="button" className="btn btn--sm" onClick={() => onStatus(e, 'Resolved')}>Mark resolved</button>
-                : <button type="button" className="btn btn--sm" onClick={() => onStatus(e, 'Open')}>Reopen</button>}
-            </>
-          )}
-          <span className="tl-acts__gap" />
-          <button type="button" className="btn btn--sm" onClick={() => setHist(!hist)} aria-expanded={hist}>History</button>
-          <button type="button" className="btn btn--sm" onClick={() => onEdit(e)}>Edit</button>
-          <button type="button" className="btn btn--sm btn--danger" onClick={() => onDelete(e)}>Delete</button>
-        </footer>
-        {hist && <History entryId={e.id} />}
-      </article>
+        </div>
+      </div>
 
       {node.children.length > 0 && (
-        <div className="tl-children">{node.children.map((c) => render(c, depth + 1))}</div>
+        <div className="tl-branch">{node.children.map((c) => render(c, depth + 1))}</div>
       )}
     </div>
   )

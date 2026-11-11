@@ -52,6 +52,8 @@ describe('filterEntries', () => {
     expect(ids({ type: 'Error' })).toEqual(['1'])
     expect(ids({ status: 'Open' })).toEqual(['1'])
     expect(ids({ author: 'Huzayfa' })).toEqual(['3'])
+    expect(ids({ author: 'Claude Code' })).toEqual(['1'])
+    expect(ids({ author: 'team' })).toEqual(['2', '3'])
   })
   it('by phase, with Other meaning anything but 1 and 2', () => {
     expect(ids({ phase: '2' })).toEqual(['1'])

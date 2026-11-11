@@ -313,13 +313,23 @@ function EditableText({
 /* ---------------- development log ---------------- */
 
 type Entry = { id: string; database_id: string; title: string; body: string; entry_date: string }
+type TlItem = { id: string; type: string; author: string; title: string; summary: string; happened_at: string; status: string | null }
 
 function LogPanel({ databaseId }: { databaseId: string }) {
   const { data, error, loading, reload } = useLoad<Entry[]>(async () =>
     unwrap<Entry[]>(await supabase.from('db_entries').select('*').eq('database_id', databaseId)
       .order('entry_date', { ascending: false }).order('created_at', { ascending: false })) ?? [], [databaseId])
+  // what Claude Code (and the team) logged on the timeline for this database also shows here
+  const tl = useLoad<TlItem[]>(async () =>
+    unwrap<TlItem[]>(await supabase.from('timeline_entries').select('id, type, author, title, summary, happened_at, status')
+      .eq('database_id', databaseId).order('happened_at', { ascending: false }).limit(500)) ?? [], [databaseId])
   const [editing, setEditing] = useState<Entry | 'new' | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+
+  const merged = [
+    ...(data ?? []).map((en) => ({ at: en.entry_date, en, t: null as TlItem | null })),
+    ...(tl.data ?? []).map((t) => ({ at: t.happened_at, en: null as Entry | null, t })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
 
   async function remove(en: Entry) {
     if (!window.confirm(`Delete "${en.title}"?`)) return
@@ -329,15 +339,28 @@ function LogPanel({ databaseId }: { databaseId: string }) {
   return (
     <>
       <div className="bar">
-        <span className="muted">Ongoing progress, newest first.</span>
+        <span className="muted">Ongoing progress, newest first. Entries Claude Code logs on the timeline appear here too.</span>
         <button type="button" className="btn btn--dark" onClick={() => setEditing('new')}>Add entry</button>
       </div>
       {msg && <p className="notice notice--err" role="alert">{msg}</p>}
-      <LoadState loading={loading && !data} error={error}>
-        {data && data.length === 0 ? (
-          <EmptyState title="No log entries yet." text="Record progress as you build and change this database." />
+      <LoadState loading={(loading && !data) || (tl.loading && !tl.data)} error={error}>
+        {merged.length === 0 ? (
+          <EmptyState title="No log entries yet." text="Claude Code adds entries as it works. You can also write one by hand." />
         ) : (
-          (data ?? []).map((en) => (
+          merged.map(({ en, t }) => t ? (
+            <article className="post" key={`t${t.id}`}>
+              <div className="post__top">
+                <h2 style={{ fontSize: 16 }}>{t.title}</h2>
+                <Link className="btn btn--sm" to={`/app/databases/${databaseId}?tab=Timeline&entry=${t.id}`}>Open on timeline</Link>
+              </div>
+              <div className="post__meta">
+                <span>{fmtDate(t.happened_at)}</span>
+                <span className={`chip${t.author === 'Claude Code' ? ' chip--on' : ''}`}>{t.author}</span>
+                <span className="chip">{t.type}{t.status ? `, ${t.status}` : ''}</span>
+              </div>
+              {t.summary && <p className="rich">{t.summary}</p>}
+            </article>
+          ) : en && (
             <article className="post" key={en.id}>
               <div className="post__top">
                 <h2 style={{ fontSize: 16 }}>{en.title}</h2>

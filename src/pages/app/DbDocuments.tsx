@@ -3,10 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import {
   ACCEPT_DOC, checkFile, describe, downloadFile, fileKind, fmtBytes, fmtDate, removeFiles, todayStr, unwrap, uploadFile,
-  useLoad, useSignedUrl,
+  useLoad,
 } from '../../lib/data'
 import type { Entry } from '../../lib/timeline'
 import { Dialog, EmptyState, Field, LoadState } from '../../components/ui'
+import { DocViewer } from '../../components/DocViewer'
 import './pages.css'
 import './timeline.css'
 
@@ -95,7 +96,7 @@ export function DbDocuments({ databaseId }: { databaseId: string }) {
                       <p className="item__meta">{[fmtDate(d.document_date), fmtBytes(d.size), ext(d).toUpperCase()].filter(Boolean).join(' · ')}</p>
                     </div>
                     <div className="item__acts">
-                      {previewable(d) && <button type="button" className="btn btn--sm" onClick={() => setPreview(d)}>Preview</button>}
+                      {previewable(d) && <button type="button" className="btn btn--sm btn--dark" onClick={() => setPreview(d)}>View</button>}
                       <button type="button" className="btn btn--sm" onClick={() => download(d)}>Download</button>
                       <button type="button" className="btn btn--sm" onClick={() => setForm({ doc: d, replace: true })}>Replace file</button>
                       <button type="button" className="btn btn--sm" onClick={() => setForm({ doc: d })}>Edit</button>
@@ -117,7 +118,7 @@ export function DbDocuments({ databaseId }: { databaseId: string }) {
                           <li key={o.id}>
                             <span>{fmtDate(o.document_date)}</span><span>{fmtBytes(o.size)}</span>
                             <span className="item__acts">
-                              {previewable(o) && <button type="button" className="btn btn--sm" onClick={() => setPreview(o)}>Preview</button>}
+                              {previewable(o) && <button type="button" className="btn btn--sm" onClick={() => setPreview(o)}>View</button>}
                               <button type="button" className="btn btn--sm" onClick={() => download(o)}>Download</button>
                             </span>
                           </li>
@@ -143,22 +144,8 @@ export function DbDocuments({ databaseId }: { databaseId: string }) {
         )}
       </Dialog>
 
-      <Dialog open={!!preview} onClose={() => setPreview(null)} title={preview?.name ?? 'Preview'}>
-        {preview && <Preview doc={preview} />}
-      </Dialog>
+      <DocViewer doc={preview ? { name: preview.name, path: preview.path, mime: preview.mime } : null} onClose={() => setPreview(null)} />
     </>
-  )
-}
-
-function Preview({ doc }: { doc: Doc }) {
-  const url = useSignedUrl(doc.path)
-  if (!url) return <p className="muted" style={{ padding: '0 18px 18px' }}>Loading preview…</p>
-  return (
-    <div className="dlg__body">
-      {fileKind(doc.mime, doc.path) === 'PDF'
-        ? <iframe src={url} title={doc.name} />
-        : <img src={url} alt={doc.name} />}
-    </div>
   )
 }
 

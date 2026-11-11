@@ -5,6 +5,7 @@ import {
   unwrap, uploadFile, useLoad, useTeam,
 } from '../../lib/data'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
+import { DocViewer } from '../../components/DocViewer'
 import { sectionByPath } from './sections'
 import './pages.css'
 
@@ -31,7 +32,9 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
 
   const rows = (data ?? []).filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()))
 
+  const [viewing, setViewing] = useState<DocRow | null>(null)
   async function open(d: DocRow) {
+    if (['PDF', 'Image'].includes(fileKind(d.mime, d.name))) return setViewing(d)
     try { window.open(await signedUrl(d.path), '_blank', 'noopener') } catch (e) { setMsg(describe(e)) }
   }
   async function download(d: DocRow) {
@@ -84,6 +87,7 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
         )}
       </LoadState>
 
+      <DocViewer doc={viewing ? { name: viewing.name, path: viewing.path, mime: viewing.mime } : null} onClose={() => setViewing(null)} />
       <UploadDialog open={uploading} onClose={() => setUploading(false)} databaseId={databaseId} onDone={reload} />
       <RenameDialog doc={renaming} onClose={() => setRenaming(null)} onDone={reload} />
     </>

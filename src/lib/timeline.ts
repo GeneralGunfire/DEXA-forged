@@ -53,7 +53,7 @@ export function filterEntries(entries: Entry[], f: Filters): Entry[] {
       if (f.phase === 'Other' ? main : e.phase !== f.phase) return false
     }
     if (f.status && e.status !== f.status) return false
-    if (f.author && e.author !== f.author) return false
+    if (f.author === 'team' ? e.author === 'Claude Code' : f.author && e.author !== f.author) return false
     const day = dayKey(e.happened_at)
     if (f.from && day < f.from) return false
     if (f.to && day > f.to) return false

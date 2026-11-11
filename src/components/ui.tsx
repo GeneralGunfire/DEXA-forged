@@ -15,8 +15,8 @@ export function PageHead({ title, blurb, action }: { title: string; blurb?: stri
 }
 
 export function Dialog({
-  open, onClose, title, children,
-}: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+  open, onClose, title, children, wide,
+}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const d = ref.current
@@ -27,7 +27,7 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      className="dlg"
+      className={`dlg${wide ? " dlg--wide" : ""}`}
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose() }}
     >
