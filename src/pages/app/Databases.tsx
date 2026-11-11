@@ -28,10 +28,10 @@ export function DatabaseBoard() {
     unwrap<Db[]>(await supabase.from('databases').select('*').order('created_at', { ascending: false })) ?? [])
   const [adding, setAdding] = useState(false)
   // how many log entries and documents each database has, for the completeness score
-  const counts = useLoad<{ log: Record<string, number>; docs: Record<string, number> }>(async () => {
+  const counts = useLoad<{ log: Record<string, number>; docs: Record<string, number>; tl: Record<string, { n: number; open: number; last: string }> }>(async () => {
     const [e, d, t, dd] = await Promise.all([
       supabase.from('db_entries').select('database_id'), supabase.from('documents').select('database_id'),
-      supabase.from('timeline_entries').select('database_id'), supabase.from('db_documents').select('database_id'),
+      supabase.from('timeline_entries').select('database_id, type, status, happened_at'), supabase.from('db_documents').select('database_id'),
     ])
     const sum = (a: Record<string, number>, b: Record<string, number>) => {
       const o = { ...a }
@@ -40,7 +40,18 @@ export function DatabaseBoard() {
     }
     // the newer tables may not exist yet on an older database, so a missing table counts as nothing
     const rows = (r: { data: unknown; error: unknown }) => (r.error ? [] : ((r.data as { database_id: string | null }[]) ?? []))
+    const tl: Record<string, { n: number; open: number; last: string }> = {}
+    if (!t.error) {
+      for (const x of (t.data ?? []) as { database_id: string | null; type: string; status: string | null; happened_at: string }[]) {
+        if (!x.database_id) continue
+        const c = (tl[x.database_id] ??= { n: 0, open: 0, last: '' })
+        c.n++
+        if (x.type === 'Error' && x.status === 'Open') c.open++
+        if (x.happened_at > c.last) c.last = x.happened_at
+      }
+    }
     return {
+      tl,
       log: sum(countBy(unwrap<{ database_id: string }[]>(e) ?? []), countBy(rows(t))),
       docs: sum(countBy(unwrap<{ database_id: string | null }[]>(d) ?? []), countBy(rows(dd))),
     }
@@ -68,15 +79,25 @@ export function DatabaseBoard() {
                 <div className="dbgrid">
                   {[...g.list].sort((x, y) => x.name.localeCompare(y.name)).map((d) => {
                     const pct = counts.data ? completeness(d, counts.data.log[d.id] ?? 0, counts.data.docs[d.id] ?? 0).pct : null
+                    const st = counts.data?.tl[d.id]
                     return (
                       <Link key={d.id} to={`/app/databases/${d.id}`} className="dbcard2">
-                        <h3>{d.name}</h3>
-                        <p>{[d.db_type, d.status].filter(Boolean).join(' · ') || 'No details yet'}</p>
-                        {pct !== null && (
-                          <div className="dbcard2__bar" role="img" aria-label={`${pct}% documented`}>
-                            <i style={{ width: `${pct}%` }} /><span>{pct}% documented</span>
-                          </div>
-                        )}
+                        <span className="dbcard2__top">
+                          <h3>{d.name}</h3>
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                        </span>
+                        <span className="dbcard2__meta">
+                          {d.db_type || 'Engine not set'}
+                          {d.status && <span className="dbcard2__status"><i aria-hidden="true" />{d.status}</span>}
+                        </span>
+                        <span className="dbcard2__foot">
+                          <span>
+                            {st ? `${st.n} ${st.n === 1 ? 'entry' : 'entries'}` : 'No entries'}
+                            {st && st.open > 0 && <b className="dbcard2__open"> · {st.open} open {st.open === 1 ? 'error' : 'errors'}</b>}
+                          </span>
+                          {pct !== null && <span>{pct}% documented</span>}
+                        </span>
+                        {pct !== null && <span className="dbcard2__bar" role="img" aria-label={`${pct}% documented`}><i style={{ width: `${pct}%` }} /></span>}
                       </Link>
                     )
                   })}

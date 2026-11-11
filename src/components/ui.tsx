@@ -3,6 +3,7 @@ import { SETUP, useSignedUrl } from '../lib/data'
 import '../pages/app/pages.css'
 
 export function PageHead({ title, blurb, action }: { title: string; blurb?: string; action?: ReactNode }) {
+  useEffect(() => { document.title = `${title} · DEXA Forged` }, [title])
   return (
     <header className="pg__head">
       <div>
@@ -71,8 +72,17 @@ export function SetupNotice() {
 export function LoadState({ loading, error, children }: { loading: boolean; error: string | null; children: ReactNode }) {
   if (error === SETUP) return <SetupNotice />
   if (error) return <p className="notice notice--err" role="alert">{error}</p>
-  if (loading) return <p className="muted">Loading…</p>
+  if (loading) return <Skeleton />
   return <>{children}</>
+}
+
+/** A quiet placeholder while a page loads, so the layout does not jump. */
+export function Skeleton() {
+  return (
+    <div className="skel" role="status" aria-busy="true" aria-label="Loading">
+      <i style={{ width: '38%' }} /><i /><i style={{ width: '82%' }} /><i style={{ width: '56%' }} />
+    </div>
+  )
 }
 
 export function EmptyState({ title, text, action }: { title: string; text?: string; action?: ReactNode }) {

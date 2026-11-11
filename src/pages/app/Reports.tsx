@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { todayStr, unwrap, useLoad, useTeam } from '../../lib/data'
 import { completeness, countBy } from '../../lib/completeness'
 import { LoadState, PageHead } from '../../components/ui'
-import { Bar, ScoreRing, Stars } from '../../components/viz'
+import { Bar, Stars } from '../../components/viz'
 import { average } from './Feedback'
 import { sectionByPath } from './sections'
 import './pages.css'
@@ -170,11 +170,11 @@ export default function Reports() {
                 <ul className="dbscores">
                   {r.scores.map(({ d, c }) => (
                     <li key={d.id}>
-                      <ScoreRing pct={c.pct} size={44} />
                       <div>
                         <Link to={`/app/databases/${d.id}`}><b>{d.name}</b></Link>
                         <small>{c.missing.length ? `Missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}` : 'Fully documented'}</small>
                       </div>
+                      <span className="meter" role="img" aria-label={`${c.pct}% documented`}><span className="meter__t"><i style={{ width: `${c.pct}%` }} /></span><b>{c.pct}%</b></span>
                     </li>
                   ))}
                 </ul>

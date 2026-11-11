@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
-import { Link, NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { ROADMAP } from '../../data/roadmap'
 import { fmtDate, postImageUrl, SETUP, todayStr, unwrap, useLoad } from '../../lib/data'
 import { plainExcerpt, SetupNotice } from '../../components/ui'
 import { SECTIONS } from './sections'
+import { ErrorBoundary } from '../../components/ErrorBoundary'
 import Messages from './Messages'
 import { DatabaseBoard, DatabaseDetail } from './Databases'
 import Branding from './Branding'
@@ -160,6 +161,7 @@ function Home({ name }: { name: string }) {
 /* ---------------- layout with the sidebar ---------------- */
 
 function Layout({ display, email }: { display: string; email: string }) {
+  const loc = useLocation()
   const linkClass = ({ isActive }: { isActive: boolean }) => `ws__link${isActive ? ' is-active' : ''}`
   const item = (to: string, label: string, ico: ReactNode, end = false) => (
     <NavLink key={to} to={to} end={end} className={linkClass}>
@@ -197,7 +199,7 @@ function Layout({ display, email }: { display: string; email: string }) {
       </aside>
 
       <main className="ws__main">
-        <Outlet />
+        <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
     </div>
   )
