@@ -1,17 +1,20 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { describe, fmtDate, todayStr, unwrap, useLoad } from '../../lib/data'
 import { Dialog, EmptyState, Field, LoadState, PageHead, Rich } from '../../components/ui'
 import { ScoreRing } from '../../components/viz'
 import { completeness, countBy } from '../../lib/completeness'
 import { DocumentsPanel } from './Documents'
+import { DbDocuments } from './DbDocuments'
+import { TimelineView } from './Timeline'
 import { sectionByPath } from './sections'
 import './pages.css'
 
 type Db = {
   id: string; name: string; machine: string; db_type: string; port: string; instance_name: string
   background: string; shortfalls: string; build_record: string; created_at: string
+  slug: string | null; status: string
 }
 
 const MACHINES = ["Rajen's PC", "Huzayfa's laptop"]
@@ -51,6 +54,7 @@ export function DatabaseBoard() {
                 <dl>
                   <div><dt>Machine</dt><dd>{d.machine || '—'}</dd></div>
                   <div><dt>Type</dt><dd>{d.db_type || '—'}</dd></div>
+                  {d.status && <div><dt>Status</dt><dd>{d.status}</dd></div>}
                 </dl>
               </Link>
             ))}
@@ -73,7 +77,7 @@ function DbForm({ db, onClose, onDone }: { db?: Db; onClose: () => void; onDone:
     const fd = new FormData(e.currentTarget)
     const name = String(fd.get('name') ?? '').trim()
     if (!name) return setErr('Give the database a name.')
-    const row = { name, machine: String(fd.get('machine') ?? '').trim(), db_type: String(fd.get('type') ?? '').trim() }
+    const row = { name, machine: String(fd.get('machine') ?? '').trim(), db_type: String(fd.get('type') ?? '').trim(), status: String(fd.get('status') ?? '').trim() }
     setBusy(true)
     try {
       if (db) unwrap(await supabase.from('databases').update(row).eq('id', db.id))
@@ -98,6 +102,7 @@ function DbForm({ db, onClose, onDone }: { db?: Db; onClose: () => void; onDone:
           <datalist id="dbtypes">{TYPES.map((t) => <option key={t} value={t} />)}</datalist>
         </Field>
       </div>
+      <Field label="Status" hint="Free text, for example Phase 1 complete."><input type="text" name="status" maxLength={80} defaultValue={db?.status ?? ''} /></Field>
       {err && <p className="formerr" role="alert">{err}</p>}
       <div className="dlg__foot">
         <button type="button" className="btn" onClick={onClose}>Cancel</button>
@@ -109,7 +114,7 @@ function DbForm({ db, onClose, onDone }: { db?: Db; onClose: () => void; onDone:
 
 /* ---------------- detail ---------------- */
 
-const TABS = ['Background', 'Build record', 'Development log', 'Documents'] as const
+const TABS = ['Timeline', 'Documents', 'Background', 'Build record', 'Development log'] as const
 type Tab = (typeof TABS)[number]
 
 export function DatabaseDetail() {
@@ -117,7 +122,10 @@ export function DatabaseDetail() {
   const nav = useNavigate()
   const { data, error, loading, reload } = useLoad<Db | null>(async () =>
     unwrap<Db | null>(await supabase.from('databases').select('*').eq('id', id).maybeSingle()), [id])
-  const [tab, setTab] = useState<Tab>('Background')
+  const [params, setParams] = useSearchParams()
+  const asked = params.get('tab')
+  const tab: Tab = (TABS as readonly string[]).includes(asked ?? '') ? (asked as Tab) : 'Timeline'
+  const setTab = (t: Tab) => setParams((p) => { p.set('tab', t); p.delete('entry'); p.delete('doc'); return p }, { replace: true })
   const [editing, setEditing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -146,7 +154,7 @@ export function DatabaseDetail() {
           <>
             <PageHead
               title={data.name}
-              blurb={[data.machine, data.db_type].filter(Boolean).join(' · ') || 'No machine or type set yet.'}
+              blurb={[data.machine, data.db_type, data.status].filter(Boolean).join(' · ') || 'No machine or type set yet.'}
               action={
                 <>
                   <button type="button" className="btn" onClick={() => setEditing(true)}>Edit details</button>
@@ -189,7 +197,13 @@ export function DatabaseDetail() {
               </>
             )}
             {tab === 'Development log' && <LogPanel databaseId={data.id} />}
-            {tab === 'Documents' && <DocumentsPanel databaseId={data.id} />}
+            {tab === 'Timeline' && <TimelineView databaseId={data.id} />}
+            {tab === 'Documents' && (
+              <>
+                <DbDocuments databaseId={data.id} />
+                <LegacyDocuments databaseId={data.id} />
+              </>
+            )}
 
             <Dialog open={editing} onClose={() => setEditing(false)} title="Edit details">
               {editing && <DbForm db={data} onClose={() => setEditing(false)} onDone={reload} />}
@@ -385,3 +399,18 @@ function EntryForm({ databaseId, entry, onClose, onDone }: { databaseId: string;
   )
 }
 
+
+/** Files uploaded before documents were dated: still shown, only if there are any. */
+function LegacyDocuments({ databaseId }: { databaseId: string }) {
+  const { data } = useLoad<number>(async () => {
+    const r = await supabase.from('documents').select('id', { count: 'exact', head: true }).eq('database_id', databaseId)
+    return r.count ?? 0
+  }, [databaseId])
+  if (!data) return null
+  return (
+    <section style={{ marginTop: 28 }}>
+      <h3 className="group-title">Earlier uploads</h3>
+      <DocumentsPanel databaseId={databaseId} />
+    </section>
+  )
+}

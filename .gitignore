@@ -12,3 +12,7 @@ dist/
 # large promo media stays out of git (will live in Supabase storage)
 assets/promo/
 *.tsbuildinfo
+
+# local queue of log entries written while offline
+forged-log-queue.jsonl
+screenshots/

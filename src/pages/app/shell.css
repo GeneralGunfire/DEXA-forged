@@ -135,14 +135,14 @@
   .wd__stats { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 860px) {
-  .ws { grid-template-columns: 1fr; margin: 0; border-radius: 0; box-shadow: none; height: auto; min-height: 100vh; overflow: visible; }
+  .ws { grid-template-columns: minmax(0, 1fr); margin: 0; border-radius: 0; box-shadow: none; height: auto; min-height: 100vh; overflow: visible; }
   .ws__side { height: auto; overflow: visible; background: #fff; border-right: 0; border-bottom: 1px solid #e9edf2; }
-  .ws__sidein { min-height: 0; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; }
+  .ws__sidein { min-height: 0; min-width: 0; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; }
   .ws__logo { padding: 0; margin: 0; border: 0; gap: 10px; }
   .ws__group { display: none; }
   .ws__user { margin: 0 0 0 auto; padding: 0; border: 0; }
   .ws__who, .ws__avatar { display: none; }
-  .ws__nav { order: 3; width: 100%; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
+  .ws__nav { order: 3; width: 100%; min-width: 0; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
   .ws__link { flex: none; height: 38px; padding: 0 12px; }
     .ws__main { height: auto; overflow: visible; }
   .wh { min-height: 76vh; }

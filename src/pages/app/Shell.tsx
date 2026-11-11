@@ -13,6 +13,8 @@ import Schedule from './Schedule'
 import Documents from './Documents'
 import Feedback from './Feedback'
 import Reports from './Reports'
+import GlobalTimeline from './Timeline'
+import Settings from './Settings'
 import './shell.css'
 
 const homeIcon = (
@@ -218,6 +220,8 @@ export default function Workspace({ session }: { session: Session }) {
         <Route path="documents" element={<Documents />} />
         <Route path="feedback" element={<Feedback />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="timeline" element={<GlobalTimeline />} />
+        <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>
     </Routes>
