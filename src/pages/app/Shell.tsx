@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
@@ -9,6 +9,7 @@ import { SECTIONS } from './sections'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
 import { FeedbackProvider } from '../../components/feedback'
 import { WaveBand } from '../../components/charts'
+import { CommandPalette } from '../../components/CommandPalette'
 import Messages from './Messages'
 import { DatabaseBoard, DatabaseDetail } from './Databases'
 import Branding from './Branding'
@@ -173,6 +174,13 @@ const NAV = [
 
 function Layout({ display, email }: { display: string; email: string }) {
   const loc = useLocation()
+  const [searching, setSearching] = useState(false)
+  // Ctrl+K or ⌘K opens the search from anywhere
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearching(true) } }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
   const linkClass = ({ isActive }: { isActive: boolean }) => `ws__link${isActive ? ' is-active' : ''}`
   const item = (to: string, label: string, ico: ReactNode, end = false) => (
     <NavLink key={to} to={to} end={end} className={linkClass}>
@@ -191,6 +199,10 @@ function Layout({ display, email }: { display: string; email: string }) {
             <span>Forged</span>
           </Link>
 
+          <button type="button" className="ws__search" onClick={() => setSearching(true)} aria-label="Search the workspace">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+            <span>Search</span><kbd>Ctrl K</kbd>
+          </button>
           <nav className="ws__nav" aria-label="Workspace">
             {NAV.map((g) => (
               <div className="ws__navgroup" key={g.label} role="group" aria-label={g.label}>
@@ -220,6 +232,7 @@ function Layout({ display, email }: { display: string; email: string }) {
       <main className="ws__main">
         <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
+      <CommandPalette open={searching} onClose={() => setSearching(false)} />
     </div>
     </FeedbackProvider>
   )
