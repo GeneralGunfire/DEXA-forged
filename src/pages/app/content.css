@@ -3,10 +3,10 @@
 .cs__h { margin: 0 0 10px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
 .cs__item { border: 1px solid #e6eaf0; border-radius: 14px; background: #fff; }
 .cs__item + .cs__item { margin-top: 8px; }
-.cs__item > summary { display: grid; gap: 3px; padding: 14px 16px; cursor: pointer; list-style: none; border-radius: 14px; }
+.cs__item > summary { position: relative; display: grid; gap: 3px; padding: 14px 44px 14px 16px; cursor: pointer; list-style: none; border-radius: 14px; }
 .cs__item > summary::-webkit-details-marker { display: none; }
-.cs__item > summary::before { content: ''; float: right; width: 8px; height: 8px; margin: 6px 2px 0 12px; border-right: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2); transform: rotate(45deg); transition: transform .18s ease; }
-.cs__item[open] > summary::before { transform: rotate(-135deg); margin-top: 10px; }
+.cs__item > summary::after { content: ''; position: absolute; right: 18px; top: 20px; width: 8px; height: 8px; border-right: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2); transform: rotate(45deg); transition: transform .18s ease; }
+.cs__item[open] > summary::after { transform: rotate(-135deg); top: 24px; }
 .cs__item > summary:hover { background: #f4f6f9; }
 .cs__item > summary:focus-visible { outline: 3px solid rgba(11, 13, 18, 0.35); outline-offset: 0; }
 .cs__title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }

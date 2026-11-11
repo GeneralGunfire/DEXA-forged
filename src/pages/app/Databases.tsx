@@ -8,6 +8,7 @@ import { DocumentsPanel } from './Documents'
 import { DbDocuments } from './DbDocuments'
 import { TimelineView } from './Timeline'
 import { ContentSections } from '../../components/ContentSections'
+import { StatTiles, WaveBand } from '../../components/charts'
 import { sectionByPath } from './sections'
 import './pages.css'
 
@@ -60,7 +61,21 @@ export function DatabaseBoard() {
   return (
     <div className="pg">
       <PageHead title={s.label} blurb={s.blurb} action={<button type="button" className="btn btn--dark" onClick={() => setAdding(true)}>New database</button>} />
+      <WaveBand />
       <LoadState loading={loading && !data} error={error}>
+        {data && data.length > 0 && counts.data && (() => {
+          const tl = Object.values(counts.data.tl)
+          const avg = Math.round(data.reduce((t, d) => t + completeness(d, counts.data!.log[d.id] ?? 0, counts.data!.docs[d.id] ?? 0).pct, 0) / data.length)
+          const open = tl.reduce((t, x) => t + x.open, 0)
+          return (
+            <StatTiles items={[
+              { value: data.length, label: 'databases', hint: `${data.filter((d) => d.machine === MACHINES[0]).length} on Machine A` },
+              { value: `${avg}%`, label: 'documented on average' },
+              { value: tl.reduce((t, x) => t + x.n, 0).toLocaleString('en-ZA'), label: 'timeline entries' },
+              { value: open, label: open === 1 ? 'open error' : 'open errors', alert: open > 0 },
+            ]} />
+          )
+        })()}
         {data && data.length === 0 ? (
           <EmptyState
             title="No databases added yet."
@@ -297,27 +312,41 @@ function ConnectionPanel({ db, onSaved }: { db: Db; onSaved: () => void }) {
 
 /** How documented this database is, and exactly what is still missing. */
 function CompletenessPanel({ db }: { db: Db }) {
-  const { data } = useLoad<{ log: number; docs: number }>(async () => {
+  const { data } = useLoad<{ log: number; docs: number; n: number; open: number; resolved: number; last: string }>(async () => {
     const head = { count: 'exact', head: true } as const
     const [e, d, t, dd] = await Promise.all([
       supabase.from('db_entries').select('id', head).eq('database_id', db.id),
       supabase.from('documents').select('id', head).eq('database_id', db.id),
-      supabase.from('timeline_entries').select('id', head).eq('database_id', db.id),
-      supabase.from('db_documents').select('id', head).eq('database_id', db.id),
+      supabase.from('timeline_entries').select('type, status, happened_at').eq('database_id', db.id),
+      supabase.from('db_documents').select('id', head).eq('database_id', db.id).eq('is_current', true),
     ])
+    const rows = (t.error ? [] : (t.data ?? [])) as { type: string; status: string | null; happened_at: string }[]
     // dated documents and timeline entries count too; a table that does not exist yet counts as nothing
-    return { log: (e.count ?? 0) + (t.error ? 0 : t.count ?? 0), docs: (d.count ?? 0) + (dd.error ? 0 : dd.count ?? 0) }
+    return {
+      log: (e.count ?? 0) + rows.length, docs: (d.count ?? 0) + (dd.error ? 0 : dd.count ?? 0),
+      n: rows.length, open: rows.filter((x) => x.type === 'Error' && x.status === 'Open').length,
+      resolved: rows.filter((x) => x.type === 'Error' && x.status === 'Resolved').length,
+      last: rows.reduce((m, x) => (x.happened_at > m ? x.happened_at : m), ''),
+    }
   }, [db.id, db.background, db.shortfalls, db.build_record, db.port, db.instance_name, db.machine, db.db_type])
   if (!data) return null
   const c = completeness(db, data.log, data.docs)
   return (
-    <section className="cbar" aria-label="Documentation progress">
-      <div className="cbar__row">
-        <strong>{c.have} of {c.total} parts documented</strong>
-        <div className="cbar__track" role="img" aria-label={`${c.pct}% documented`}><i style={{ width: `${c.pct}%` }} /></div>
-      </div>
-      <p>{c.missing.length === 0 ? 'Everything this record needs is filled in.' : `Still missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}.`}</p>
-    </section>
+    <>
+      <section className="cbar" aria-label="Documentation progress">
+        <div className="cbar__row">
+          <strong>{c.have} of {c.total} parts documented</strong>
+          <div className="cbar__track" role="img" aria-label={`${c.pct}% documented`}><i style={{ width: `${c.pct}%` }} /></div>
+        </div>
+        <p>{c.missing.length === 0 ? 'Everything this record needs is filled in.' : `Still missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}.`}</p>
+      </section>
+      <StatTiles items={[
+        { value: data.n.toLocaleString('en-ZA'), label: data.n === 1 ? 'timeline entry' : 'timeline entries', hint: data.last ? `last ${fmtDate(data.last)}` : undefined },
+        { value: data.open, label: data.open === 1 ? 'open error' : 'open errors', alert: data.open > 0, hint: data.resolved ? `${data.resolved} resolved` : undefined },
+        { value: data.docs, label: data.docs === 1 ? 'document' : 'documents' },
+        { value: `${c.pct}%`, label: 'documented' },
+      ]} />
+    </>
   )
 }
 

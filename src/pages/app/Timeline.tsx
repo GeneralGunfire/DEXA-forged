@@ -9,6 +9,7 @@ import {
 } from '../../lib/timeline'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { ContentSections } from '../../components/ContentSections'
+import { Columns, StatTiles, WaveBand } from '../../components/charts'
 import { sectionByPath } from './sections'
 import './pages.css'
 import './timeline.css'
@@ -25,6 +26,7 @@ export default function GlobalTimeline() {
   return (
     <div className="pg pg--wide">
       <PageHead title={s.label} blurb={s.blurb} />
+      <WaveBand />
       <ContentSections databaseId={null} area="estate" />
       <TimelineView />
     </div>
@@ -95,7 +97,6 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
     for (const e of shown) { const d = dayKey(e.happened_at); const r = m.get(d) ?? {}; r[e.type] = (r[e.type] ?? 0) + 1; m.set(d, r) }
     return [...m.entries()].sort((x, y) => x[0].localeCompare(y[0])).slice(-60)
   }, [shown])
-  const peak = Math.max(1, ...days.map(([, r]) => Object.values(r).reduce((a, b) => a + b, 0)))
 
   useEffect(() => {
     const els = [...document.querySelectorAll<HTMLElement>('[data-day]')]
@@ -157,19 +158,23 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
         {fromClaude} of {all.length} {all.length === 1 ? 'entry' : 'entries'} came from Claude Code
         {openErrors > 0 ? `, and ${openErrors} ${openErrors === 1 ? 'error is' : 'errors are'} still open.` : '.'}
       </p>
+      <StatTiles items={[
+        { value: all.length.toLocaleString('en-ZA'), label: all.length === 1 ? 'entry' : 'entries' },
+        { value: all.length ? `${Math.round((fromClaude / all.length) * 100)}%` : '0%', label: 'from Claude Code' },
+        { value: openErrors, label: openErrors === 1 ? 'open error' : 'open errors', alert: openErrors > 0 },
+        { value: all.filter((x) => x.type === 'Error' && x.status === 'Resolved').length, label: 'errors resolved' },
+      ]} />
 
-      {days.length > 7 && (
-        <div className="tl-scrub" role="group" aria-label="Activity by day. Choose a day to jump to it.">
-          {days.map(([d, r]) => {
-            const total = Object.values(r).reduce((a, b) => a + b, 0)
-            return (
-              <button type="button" key={d} className={`tl-scrub__bar${d === activeDay ? ' is-on' : ''}`} onClick={() => jumpDay(d)}
-                title={`${fmtDay(d)}: ${total} ${total === 1 ? 'entry' : 'entries'}`} aria-label={`${fmtDay(d)}, ${total} ${total === 1 ? 'entry' : 'entries'}`}>
-                <span style={{ height: `${Math.max(14, (total / peak) * 100)}%` }} />
-              </button>
-            )
+      {days.length > 3 && (
+        <Columns
+          ariaLabel="Entries per day. Choose a day to jump to it."
+          activeKey={activeDay}
+          onSelect={jumpDay}
+          data={days.map(([d, r]) => {
+            const total = Object.values(r).reduce((x, y) => x + y, 0)
+            return { key: d, label: fmtDay(d).replace(/^\w+, /, ''), value: total, tip: `${fmtDay(d)}: ${total} ${total === 1 ? 'entry' : 'entries'}` }
           })}
-        </div>
+        />
       )}
 
       <div className="tl-bar">

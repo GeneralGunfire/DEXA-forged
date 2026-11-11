@@ -16,8 +16,9 @@ Options: --db <slug>        database slug (omit, or "estate", for the whole-esta
          --area background|build|estate
          --title <text>     section title (with db and area, identifies the section)
          --summary <text>   one or two plain-word sentences shown while the section is closed
-         --kind text|table|queries|sources      (default text)
+         --kind text|table|queries|sources|chart   (default text)
          --body <text> | --body-file <file>     markdown-style text, or the query text for kind queries
+         --chart-file <file> a JSON chart (bar, stacked or before-after); see docs/forged-content.md
          --csv-file <file>  a CSV with a header row; sent as a table (kind table)
          --position <n>     order on the page, lowest first (default 100)
          --open             show the section expanded (default collapsed)
@@ -53,6 +54,7 @@ function parse(argv) {
     else if (a === '--title') o.title = val(a, i++)
     else if (a === '--summary') o.summary = val(a, i++)
     else if (a === '--kind') o.kind = val(a, i++)
+    else if (a === '--chart-file') { const f = val(a, i++); try { o.body = fs.readFileSync(f, 'utf8') } catch { fail(`Cannot read ${f}.`) } o.kind = 'chart' }
     else if (a === '--position') o.position = Number(val(a, i++))
     else if (a === '--body') o.body = val(a, i++)
     else if (a === '--body-file') { const f = val(a, i++); try { o.body = fs.readFileSync(f, 'utf8') } catch { fail(`Cannot read ${f}.`) } }

@@ -8,7 +8,7 @@ import type { TokenRow } from './ingest.ts'
  */
 
 export const AREAS = ['background', 'build', 'estate']
-export const KINDS = ['text', 'table', 'queries', 'sources']
+export const KINDS = ['text', 'table', 'queries', 'sources', 'chart']
 export const RATE_LIMIT_PER_MINUTE = 60
 export const MAX_BODY = 400_000
 const MAX_TABLE_ROWS = 3000
@@ -45,6 +45,26 @@ function checkTable(body: string): { ok: true; flat: string } | { ok: false; err
     }
   }
   return { ok: true, flat: [...(o.columns as string[]), ...(o.rows as string[][]).flat()].join('\n') }
+}
+
+/** A chart body is JSON: {"type":"bar"|"stacked"|"before-after","unit":"%","items":[{"label","value"} or {"label","before","after"}]}. */
+function checkChart(body: string): { ok: true; flat: string } | { ok: false; error: string } {
+  const bad = { ok: false as const, error: 'A chart body must be JSON with a "type" (bar, stacked or before-after) and a list of "items".' }
+  let t: unknown
+  try { t = JSON.parse(body) } catch { return bad }
+  const o = t as { type?: unknown; unit?: unknown; items?: unknown }
+  if (!o || !['bar', 'stacked', 'before-after'].includes(String(o.type)) || !Array.isArray(o.items)) return bad
+  if (o.items.length < 1 || o.items.length > 40) return { ok: false, error: 'A chart needs 1 to 40 items.' }
+  if (o.unit !== undefined && (typeof o.unit !== 'string' || o.unit.length > 8)) return { ok: false, error: 'The chart unit must be short text.' }
+  const labels: string[] = []
+  for (const i of o.items as Record<string, unknown>[]) {
+    const need = o.type === 'before-after' ? ['before', 'after'] : ['value']
+    if (!i || typeof i.label !== 'string' || !i.label || i.label.length > MAX_CELL || !need.every((k) => typeof i[k] === 'number' && Number.isFinite(i[k] as number))) {
+      return { ok: false, error: o.type === 'before-after' ? 'Every item needs a label and numeric before and after values.' : 'Every item needs a label and a numeric value.' }
+    }
+    labels.push(i.label)
+  }
+  return { ok: true, flat: labels.join(String.fromCharCode(10)) }
 }
 
 export async function handleContent(req: Request, store: ContentStore, now: Date = new Date()): Promise<Response> {
@@ -89,6 +109,11 @@ export async function handleContent(req: Request, store: ContentStore, now: Date
     const t = checkTable(body)
     if (!t.ok) return json(422, { error: t.error })
     text = t.flat
+  }
+  if (kind === 'chart') {
+    const c = checkChart(body)
+    if (!c.ok) return json(422, { error: c.error })
+    text = c.flat
   }
   // never stores patient-level data, secrets or credentials; never echoes the matched value
   const red = checkRedaction({ title, summary, body: text })

@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtDate, unwrap, useLoad } from '../lib/data'
 import { Rich } from './ui'
+import { ChartBlock } from './charts'
 import '../pages/app/content.css'
 
 type Section = {
-  id: string; title: string; summary: string; kind: 'text' | 'table' | 'queries' | 'sources'
+  id: string; title: string; summary: string; kind: 'text' | 'table' | 'queries' | 'sources' | 'chart'
   body: string; collapsed: boolean; position: number; updated_at: string
 }
 type TableData = { columns: string[]; rows: string[][] }
@@ -32,7 +33,7 @@ export function ContentSections({ databaseId, area }: { databaseId: string | nul
             {s.summary && <span className="cs__sum">{s.summary}</span>}
           </summary>
           <div className="cs__body">
-            {s.kind === 'table' ? <TableView body={s.body} /> : s.kind === 'queries' ? <Queries body={s.body} /> : <Rich text={s.body} />}
+            {s.kind === 'table' ? <TableView body={s.body} /> : s.kind === 'chart' ? <ChartBlock body={s.body} /> : s.kind === 'queries' ? <Queries body={s.body} /> : <Rich text={s.body} />}
             <p className="cs__foot">Written by Claude Code, updated {fmtDate(s.updated_at)}.</p>
           </div>
         </details>

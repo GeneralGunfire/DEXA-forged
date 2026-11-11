@@ -124,6 +124,9 @@ export function Rich({ text }: { text: string }) {
     <div className="rich">
       {blocks.map((b, i) => {
         const lines = b.split('\n')
+        if (lines.every((l) => /^>\s?/.test(l))) {
+          return <aside className="callout" key={i}><b>In plain words</b><div>{lines.map((l) => l.replace(/^>\s?/, '')).join(' ')}</div></aside>
+        }
         if (lines.every((l) => /^\s*-\s+/.test(l))) {
           return <ul key={i}>{lines.map((l, j) => <li key={j}>{inline(l.replace(/^\s*-\s+/, ''))}</li>)}</ul>
         }

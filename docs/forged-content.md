@@ -35,7 +35,7 @@ It prints only the section id. Writing the same database, area and title again r
 | `--db` | Database slug, for example `public_hospital`. Leave out for `--area estate`. |
 | `--area` | `background`, `build` or `estate`. |
 | `--title`, `--summary` | The title and a short plain-words summary shown while the section is closed. |
-| `--kind` | `text` (default), `table`, `queries` (shown as pre-formatted read-only query text) or `sources`. |
+| `--kind` | `text` (default), `table`, `queries` (pre-formatted read-only query text), `sources` or `chart`. A chart body is JSON: `{"type":"bar","unit":"","items":[{"label":"Tablet","value":58}]}`; `stacked` takes the same items (an ordered split of one total); `before-after` takes items with `before` and `after` numbers. Start a paragraph with `> ` for a blue "In plain words" callout. |
 | `--body`, `--body-file` | The text. Light formatting only: `**bold**`, `*italic*`, `[text](https://link)`, `- ` lists, blank line for a new paragraph. |
 | `--csv-file` | A CSV with a header row, sent as a table (up to 12 columns and 3,000 rows). |
 | `--position`, `--open` | Order on the page (lowest first), and whether the section starts open. |

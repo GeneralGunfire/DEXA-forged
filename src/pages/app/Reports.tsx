@@ -5,6 +5,7 @@ import { todayStr, unwrap, useLoad, useTeam } from '../../lib/data'
 import { completeness, countBy } from '../../lib/completeness'
 import { LoadState, PageHead } from '../../components/ui'
 import { Bar, Stars } from '../../components/viz'
+import { BarList, Columns, StatTiles, Takeaways, WaveBand } from '../../components/charts'
 import { average } from './Feedback'
 import { sectionByPath } from './sections'
 import './pages.css'
@@ -108,7 +109,23 @@ export default function Reports() {
     if (newFb) insights.push(`${newFb} feedback item${newFb === 1 ? ' has' : 's have'} not been read yet.`)
     if (!insights.length) insights.push('Nothing to report yet. Add tasks, databases or feedback and this fills in by itself.')
 
-    return { scores, avgScore, open, overdue, done, byPerson, fb, fbAvg, dist, topPages, posts, logs, uploads, newFb, insights, logCount, docCount }
+    // log entries per week for the last 12 weeks (week starts on Monday)
+    const weekStart = (iso: string) => {
+      const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso)
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+      return todayKey(d)
+    }
+    const todayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const byWeek: Record<string, number> = {}
+    for (const e of data.entries) { const k = weekStart(e.entry_date); byWeek[k] = (byWeek[k] ?? 0) + 1 }
+    const weeks: { key: string; label: string; value: number }[] = []
+    const cur = new Date(weekStart(todayStr()) + 'T00:00:00')
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(cur); d.setDate(d.getDate() - i * 7)
+      const k = todayKey(d)
+      weeks.push({ key: k, label: d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }), value: byWeek[k] ?? 0 })
+    }
+    return { weeks: weeks.some((w) => w.value > 0) ? weeks : [], scores, avgScore, open, overdue, done, byPerson, fb, fbAvg, dist, topPages, posts, logs, uploads, newFb, insights, logCount, docCount }
   }, [data, period])
 
   const label = PERIODS.find((p) => p.v === period)!.label
@@ -137,6 +154,8 @@ export default function Reports() {
         }
       />
 
+      <WaveBand />
+
       <div className="bar noprint">
         <div className="seg" role="group" aria-label="Period">
           {PERIODS.map((p) => <button key={p.v} type="button" aria-pressed={period === p.v} onClick={() => setPeriod(p.v)}>{p.label}</button>)}
@@ -148,18 +167,22 @@ export default function Reports() {
           <>
             <h2 className="print-title">DEXA Forged report: {label}</h2>
 
-            <section className="rsec">
-              <h3>Highlights</h3>
-              <ul className="insights">{r.insights.map((i) => <li key={i}>{i}</li>)}</ul>
-            </section>
+            <Takeaways title="Highlights" items={r.insights} />
 
-            <div className="rtiles">
-              <div><strong>{r.posts}</strong><span>posts</span></div>
-              <div><strong>{r.logs}</strong><span>log entries</span></div>
-              <div><strong>{r.uploads}</strong><span>uploads</span></div>
-              <div><strong>{r.fb.length}</strong><span>feedback</span></div>
-              <div><strong>{r.done.length}<small>/{r.done.length + r.open.length}</small></strong><span>tasks done</span></div>
-            </div>
+            <StatTiles items={[
+              { value: r.posts, label: 'posts' },
+              { value: r.logs.toLocaleString('en-ZA'), label: 'log entries' },
+              { value: r.uploads, label: 'uploads' },
+              { value: r.fb.length, label: 'feedback' },
+              { value: `${r.done.length}/${r.done.length + r.open.length}`, label: 'tasks done', alert: r.overdue.length > 0, hint: r.overdue.length ? `${r.overdue.length} overdue` : undefined },
+            ]} />
+
+            {r.weeks.length > 1 && (
+              <section className="rsec">
+                <div className="rsec__head"><h3>Activity by week</h3><span className="muted">Log entries, newest on the right</span></div>
+                <Columns data={r.weeks} ariaLabel="Log entries per week" height={96} />
+              </section>
+            )}
 
             <section className="rsec">
               <div className="rsec__head">
@@ -167,17 +190,15 @@ export default function Reports() {
                 <span className="muted">Average {r.avgScore}%. <Link to="/app/databases">Open the board</Link></span>
               </div>
               {r.scores.length === 0 ? <p className="muted">No databases yet.</p> : (
-                <ul className="dbscores">
-                  {r.scores.map(({ d, c }) => (
-                    <li key={d.id}>
-                      <div>
-                        <Link to={`/app/databases/${d.id}`}><b>{d.name}</b></Link>
-                        <small>{c.missing.length ? `Missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}` : 'Fully documented'}</small>
-                      </div>
-                      <span className="meter" role="img" aria-label={`${c.pct}% documented`}><span className="meter__t"><i style={{ width: `${c.pct}%` }} /></span><b>{c.pct}%</b></span>
-                    </li>
-                  ))}
-                </ul>
+                <BarList
+                  ariaLabel="Documentation progress by database"
+                  max={100}
+                  track
+                  items={r.scores.map(({ d, c }) => ({
+                    label: d.name, to: `/app/databases/${d.id}`, value: c.pct, text: `${c.pct}%`,
+                    note: c.missing.length ? `Missing: ${c.missing.map((m) => m.label.toLowerCase()).join(', ')}` : 'Fully documented',
+                  }))}
+                />
               )}
             </section>
 

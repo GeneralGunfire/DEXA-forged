@@ -60,6 +60,15 @@ describe('content-write', () => {
     expect((await post({ ...ok, kind: 'table', body: 'not json' })).status).toBe(422)
     expect((await post({ ...ok, kind: 'table', body: JSON.stringify({ columns: ['a'], rows: [['1', '2']] }) })).status).toBe(422)
   })
+  it('checks charts: type, items and numbers', async () => {
+    const bar = JSON.stringify({ type: 'bar', items: [{ label: 'Tablet', value: 58 }, { label: 'Capsule', value: 7 }] })
+    expect((await post({ ...ok, kind: 'chart', body: bar })).status).toBe(201)
+    const ba = JSON.stringify({ type: 'before-after', unit: '%', items: [{ label: 'Private hospital', before: 0, after: 29 }] })
+    expect((await post({ ...ok, title: 'Match rates', kind: 'chart', body: ba })).status).toBe(201)
+    expect((await post({ ...ok, kind: 'chart', body: JSON.stringify({ type: 'pie', items: [] }) })).status).toBe(422)
+    expect((await post({ ...ok, kind: 'chart', body: JSON.stringify({ type: 'bar', items: [{ label: 'x', value: 'many' }] }) })).status).toBe(422)
+    expect((await post({ ...ok, kind: 'chart', body: JSON.stringify({ type: 'bar', items: [{ label: 'mail a@b.co', value: 1 }] }) })).status).toBe(422)
+  })
   it('runs the redaction check on body, title and table cells and never echoes the value', async () => {
     const r = await post({ ...ok, body: 'Contact sipho@example.com for access' })
     expect(r.status).toBe(422)
