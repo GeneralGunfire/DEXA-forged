@@ -8,6 +8,7 @@ import { completeness, countBy } from '../../lib/completeness'
 import { DocumentsPanel } from './Documents'
 import { DbDocuments } from './DbDocuments'
 import { TimelineView } from './Timeline'
+import { ContentSections } from '../../components/ContentSections'
 import { sectionByPath } from './sections'
 import './pages.css'
 
@@ -184,6 +185,7 @@ export function DatabaseDetail() {
                   empty="The real-world shortfalls of this system: what it gets wrong, misses or cannot do."
                   onSave={(t) => saveField('shortfalls', t)}
                 />
+                <ContentSections databaseId={data.id} area="background" />
               </>
             )}
             {tab === 'Build record' && (
@@ -194,6 +196,7 @@ export function DatabaseDetail() {
                   empty="Tables, how it was populated, versions and anything else needed to rebuild it."
                   onSave={(t) => saveField('build_record', t)} rows={14}
                 />
+                <ContentSections databaseId={data.id} area="build" />
               </>
             )}
             {tab === 'Development log' && <LogPanel databaseId={data.id} />}

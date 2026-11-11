@@ -7,18 +7,18 @@ import { sectionByPath } from './sections'
 import './pages.css'
 import './timeline.css'
 
-type Tok = { id: string; label: string; created_at: string; last_used_at: string | null; revoked_at: string | null }
+type Tok = { id: string; label: string; scope: string; created_at: string; last_used_at: string | null; revoked_at: string | null }
 
 /** A 256-bit random token. Only its SHA-256 hash is ever stored. */
-function newToken() {
+function newToken(prefix = 'fgl_') {
   const b = crypto.getRandomValues(new Uint8Array(32))
-  return 'fgl_' + btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return prefix + btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 export default function Settings() {
   const s = sectionByPath('settings')
   const { data, error, loading, reload } = useLoad<Tok[]>(async () =>
-    unwrap<Tok[]>(await supabase.from('log_tokens').select('id, label, created_at, last_used_at, revoked_at').order('created_at', { ascending: false })) ?? [])
+    unwrap<Tok[]>(await supabase.from('log_tokens').select('id, label, scope, created_at, last_used_at, revoked_at').order('created_at', { ascending: false })) ?? [])
   const [fresh, setFresh] = useState<string | null>(null)
   const [shown, setShown] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -29,12 +29,14 @@ export default function Settings() {
   async function create(ev: FormEvent<HTMLFormElement>) {
     ev.preventDefault()
     const form = ev.currentTarget
+    const submitter = (ev.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const scope = submitter?.value === 'content' ? 'content' : 'log'
     const label = String(new FormData(form).get('label') ?? '').trim()
     if (!label) return setErr('Name the token, for example "Phase 2 Claude Code".')
     setBusy(true)
     try {
-      const token = newToken()
-      unwrap(await supabase.from('log_tokens').insert({ label, token_hash: await sha256Hex(token) }))
+      const token = newToken(scope === 'content' ? 'fgc_' : 'fgl_')
+      unwrap(await supabase.from('log_tokens').insert({ label, scope, token_hash: await sha256Hex(token) }))
       setFresh(token); setShown(false); setCopied(false); setErr(null); form.reset(); reload()
     } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
@@ -54,7 +56,7 @@ export default function Settings() {
       <section className="panel">
         <h3>Log access</h3>
         <p className="muted" style={{ marginBottom: 14 }}>
-          A log token lets Claude Code and scripts add timeline entries without signing in. It can only add entries; it cannot read or delete anything.
+          A log token lets Claude Code and scripts add timeline entries without signing in. A content token lets it write the in-depth Background and Build record sections. Each can only write its own kind of content; neither can read or delete anything.
         </p>
 
         {fresh && (
@@ -71,7 +73,8 @@ export default function Settings() {
 
         <form onSubmit={create} style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 220px' }}><Field label="Token name"><input type="text" name="label" maxLength={80} placeholder="e.g. Phase 2 Claude Code" /></Field></div>
-          <button type="submit" className="btn btn--dark" disabled={busy} style={{ marginBottom: 14 }}>{busy ? 'Creating…' : 'Create log token'}</button>
+          <button type="submit" name="scope" value="log" className="btn btn--dark" disabled={busy} style={{ marginBottom: 14 }}>{busy ? 'Creating…' : 'Create log token'}</button>
+          <button type="submit" name="scope" value="content" className="btn" disabled={busy} style={{ marginBottom: 14 }}>Create content token</button>
         </form>
         {err && <p className="formerr" role="alert">{err}</p>}
 
@@ -84,7 +87,7 @@ export default function Settings() {
               {(data ?? []).map((t) => (
                 <div className={`tok${t.revoked_at ? ' is-revoked' : ''}`} key={t.id}>
                   <div className="item__main">
-                    <p className="item__title">{t.label}</p>
+                    <p className="item__title">{t.label} <span className="chip">{t.scope === 'content' ? 'Content' : 'Log'}</span></p>
                     <p className="item__meta">
                       Created {fmtDate(t.created_at)} · {t.last_used_at ? `last used ${fmtDate(t.last_used_at)}` : 'never used'}
                       {t.revoked_at ? ` · revoked ${fmtDate(t.revoked_at)}` : ''}
@@ -103,7 +106,10 @@ export default function Settings() {
         <p className="muted">Set these two environment variables, then run <code>forged-log</code>. Details are in <code>docs/forged-log.md</code>.</p>
         <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_LOG_URL</b></p>
         <code style={{ display: 'block', overflowWrap: 'anywhere' }}>{endpoint}</code>
-        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_LOG_TOKEN</b> is the token you copied above.</p>
+        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_LOG_TOKEN</b> is the log token you copied above.</p>
+        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_CONTENT_URL</b></p>
+        <code style={{ display: 'block', overflowWrap: 'anywhere' }}>{endpoint.replace('log-ingest', 'content-write')}</code>
+        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_CONTENT_TOKEN</b> is the content token.</p>
       </section>
     </div>
   )

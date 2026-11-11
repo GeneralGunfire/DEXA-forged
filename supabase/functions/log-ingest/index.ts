@@ -15,7 +15,7 @@ const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE
 const store: IngestStore = {
   async findToken(hash) {
     const { data } = await admin.from('log_tokens')
-      .select('id, revoked_at, window_start, window_count').eq('token_hash', hash).maybeSingle()
+      .select('id, revoked_at, window_start, window_count, scope').eq('token_hash', hash).maybeSingle()
     return data
   },
   async saveRate(id, windowStart, count, usedAt) {

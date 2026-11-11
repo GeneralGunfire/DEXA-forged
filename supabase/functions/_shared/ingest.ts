@@ -12,6 +12,7 @@ export const RATE_LIMIT_PER_MINUTE = 60
 
 export type TokenRow = {
   id: string; revoked_at: string | null; window_start: string | null; window_count: number
+  scope?: string   // 'log' or 'content'; a content token cannot write timeline entries
 }
 export type NewEntry = {
   database_id: string | null; happened_at: string; type: string; phase: string; author: string
@@ -42,7 +43,7 @@ export async function handleIngest(req: Request, store: IngestStore, now: Date =
   const m = (req.headers.get('authorization') ?? '').match(/^Bearer\s+(\S+)$/i)
   if (!m) return json(401, { error: 'Missing log token.' })
   const token = await store.findToken(await sha256Hex(m[1]))
-  if (!token || token.revoked_at) return json(401, { error: 'This log token is not valid.' })
+  if (!token || token.revoked_at || (token.scope && token.scope !== 'log')) return json(401, { error: 'This log token is not valid.' })
 
   // ---- rate limit: 60 requests per token per minute (rejected ones count too) ----
   const start = token.window_start ? new Date(token.window_start) : null

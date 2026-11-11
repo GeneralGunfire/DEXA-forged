@@ -12,7 +12,7 @@ let store: IngestStore
 
 beforeEach(async () => {
   inserted = []; resolved = []
-  token = { id: 'tok1', revoked_at: null, window_start: null, window_count: 0 }
+  token = { id: 'tok1', revoked_at: null, window_start: null, window_count: 0, scope: 'log' }
   const hash = await sha256Hex(TOKEN)
   store = {
     findToken: async (h) => (h === hash ? token : null),
@@ -50,6 +50,11 @@ describe('log-ingest', () => {
     expect((await post({ title: 'x' }, null)).status).toBe(401)
     expect((await post({ title: 'x' }, 'Bearer nope')).status).toBe(401)
     token = { ...token, revoked_at: '2026-11-10T00:00:00Z' }
+    expect((await post({ title: 'x' })).status).toBe(401)
+    expect(inserted).toHaveLength(0)
+  })
+  it('refuses a content token', async () => {
+    token = { ...token, scope: 'content' }
     expect((await post({ title: 'x' })).status).toBe(401)
     expect(inserted).toHaveLength(0)
   })

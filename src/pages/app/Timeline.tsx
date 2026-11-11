@@ -8,6 +8,7 @@ import {
   PHASES, STATUSES, toLocalInput, TYPES, type Entry, type EntryType, type Filters, type Node as TNode,
 } from '../../lib/timeline'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
+import { ContentSections } from '../../components/ContentSections'
 import { sectionByPath } from './sections'
 import './pages.css'
 import './timeline.css'
@@ -25,6 +26,7 @@ export default function GlobalTimeline() {
   return (
     <div className="pg pg--wide">
       <PageHead title={s.label} blurb={s.blurb} />
+      <ContentSections databaseId={null} area="estate" />
       <TimelineView />
     </div>
   )
