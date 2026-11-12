@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
-import { describe, fmtDate, todayStr, unwrap, useLoad, useTeam } from '../../lib/data'
+import { describe, fmtDate, todayStr, unwrap, useLoad, useRole, useTeam } from '../../lib/data'
 import { StatTiles } from '../../components/charts'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
@@ -20,6 +20,7 @@ export default function Schedule() {
   const { confirm } = useFeedback()
   const s = sectionByPath('schedule')
   const { team, name: who } = useTeam()
+  const me = useRole()
   const { data, error, loading, reload } = useLoad<Task[]>(async () =>
     unwrap<Task[]>(await supabase.from('tasks').select('*').order('due_date', { ascending: true, nullsFirst: false })) ?? [])
 
@@ -88,6 +89,7 @@ export default function Schedule() {
   return (
     <div className="pg">
       <PageHead title={s.label} blurb={s.blurb} action={<button type="button" className="btn btn--dark" onClick={() => setEditing({ task: null })}>New task or event</button>} />
+      {!me.isAdmin && <p className="muted" style={{ margin: '-6px 0 14px' }}>You see tasks assigned to you, tasks you created and tasks with nobody assigned.</p>}
 
       {all.length > 0 && (() => {
         const week = new Date(); week.setDate(week.getDate() + 7)

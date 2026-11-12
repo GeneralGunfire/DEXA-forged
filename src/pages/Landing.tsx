@@ -260,7 +260,7 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
         <section id="about" className="lp__band">
           <div className="lp__wrap lp__about">
             <div className="lp__aboutimg">
-              <img src="/about-helicopter.png" alt="Air ambulance helicopter flying in front of a mountain" />
+              <img src="/about-helicopter.jpg" alt="Air ambulance helicopter flying in front of a mountain" />
             </div>
             <div className="lp__abouttext">
               <h2>Built for the whole journey of care</h2>
@@ -332,7 +332,7 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
             </div>
             <div className="lp__explorerimg">
               <img
-                src="/explorer-preview.png"
+                src="/explorer-preview.jpg"
                 alt="The SAHealth explorer: its overview page, with a top navigation bar and a hero image of a South African city"
                 loading="lazy"
               />

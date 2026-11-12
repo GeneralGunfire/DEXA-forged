@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
@@ -12,17 +12,34 @@ import { WaveBand } from '../../components/charts'
 import { CrumbProvider, TopBar } from '../../components/nav'
 import { CommandPalette } from '../../components/CommandPalette'
 import { Dashboard } from './Dashboard'
-import Messages from './Messages'
-import { DatabaseBoard, DatabaseDetail } from './Databases'
-import Branding from './Branding'
-import Schedule from './Schedule'
-import Documents from './Documents'
-import Feedback from './Feedback'
-import Reports from './Reports'
-import GlobalTimeline from './Timeline'
-import Settings from './Settings'
-import ClaudeStart from './ClaudeStart'
+import { Skeleton } from '../../components/ui'
 import './shell.css'
+import './revamp.css'
+
+// Each page is its own download, fetched when first opened (and quietly prefetched once the app is idle).
+const loaders = {
+  messages: () => import('./Messages'),
+  databases: () => import('./Databases'),
+  branding: () => import('./Branding'),
+  schedule: () => import('./Schedule'),
+  documents: () => import('./Documents'),
+  feedback: () => import('./Feedback'),
+  reports: () => import('./Reports'),
+  timeline: () => import('./Timeline'),
+  settings: () => import('./Settings'),
+  claude: () => import('./ClaudeStart'),
+}
+const Messages = lazy(loaders.messages)
+const DatabaseBoard = lazy(() => loaders.databases().then((m) => ({ default: m.DatabaseBoard })))
+const DatabaseDetail = lazy(() => loaders.databases().then((m) => ({ default: m.DatabaseDetail })))
+const Branding = lazy(loaders.branding)
+const Schedule = lazy(loaders.schedule)
+const Documents = lazy(loaders.documents)
+const Feedback = lazy(loaders.feedback)
+const Reports = lazy(loaders.reports)
+const GlobalTimeline = lazy(loaders.timeline)
+const Settings = lazy(loaders.settings)
+const ClaudeStart = lazy(loaders.claude)
 
 const homeIcon = (
   <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -161,6 +178,22 @@ function Layout({ display, email }: { display: string; email: string }) {
   const loc = useLocation()
   const [searching, setSearching] = useState(false)
   const counts = useNavCounts()
+  const [drawer, setDrawer] = useState(false) // the slide-in menu on phones
+  // close the menu after going to a page, on Escape, and stop the page behind it scrolling while it is open
+  useEffect(() => { setDrawer(false) }, [loc.pathname])
+  useEffect(() => {
+    if (!drawer) return
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawer(false) }
+    window.addEventListener('keydown', key)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', key); document.body.style.overflow = prev }
+  }, [drawer])
+  // once the app is idle, download the other pages in the background so they open instantly
+  useEffect(() => {
+    const idle = (window as unknown as { requestIdleCallback?: (f: () => void) => number }).requestIdleCallback ?? ((f: () => void) => window.setTimeout(f, 1500))
+    idle(() => { Object.values(loaders).forEach((l) => { l().catch(() => undefined) }) })
+  }, [])
   const [rail, setRail] = useState(() => { try { return localStorage.getItem('forged_rail') === '1' } catch { return false } })
   const toggleRail = () => setRail((r) => { try { localStorage.setItem('forged_rail', r ? '0' : '1') } catch { /* storage blocked */ } return !r })
   // Ctrl+K or ⌘K opens the search from anywhere
@@ -175,10 +208,11 @@ function Layout({ display, email }: { display: string; email: string }) {
     schedule: counts && counts.overdue > 0 ? { n: counts.overdue, tone: 'bad', what: 'overdue tasks' } : undefined,
     feedback: counts && counts.feedback > 0 ? { n: counts.feedback, tone: 'info', what: 'new feedback' } : undefined,
   }
+  let linkNo = 0
   const item = (key: string, to: string, label: string, ico: ReactNode, end = false) => {
     const bd = badge[key]
     return (
-      <NavLink key={to} to={to} end={end} className={linkClass} title={rail ? label : undefined}>
+      <NavLink key={to} to={to} end={end} className={linkClass} title={rail ? label : undefined} style={{ '--i': linkNo++ } as CSSProperties}>
         {ico}
         <span className="ws__lbl">{label}</span>
         {bd && <b className={`ws__badge ws__badge--${bd.tone}`} aria-label={`${bd.n} ${bd.what}`}>{bd.n > 99 ? '99+' : bd.n}</b>}
@@ -189,9 +223,13 @@ function Layout({ display, email }: { display: string; email: string }) {
   return (
     <FeedbackProvider>
     <CrumbProvider>
-    <div className={`ws${rail ? ' ws--rail' : ''}`}>
-      <aside className="ws__side">
+    <div className={`ws${rail ? ' ws--rail' : ''}${drawer ? ' ws--drawer' : ''}`}>
+      <button type="button" className="ws__scrim" tabIndex={-1} aria-hidden="true" onClick={() => setDrawer(false)} />
+      <aside className="ws__side" id="ws-menu" aria-label="Menu">
         <div className="ws__sidein">
+          <button type="button" className="ws__close" onClick={() => setDrawer(false)} aria-label="Close the menu">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
           <div className="ws__top">
             <Link to="/" className="ws__logo" aria-label="DEXA Forged, public site">
               <img src="/dexa-logo-navy.png" alt="DEXA" />
@@ -233,8 +271,19 @@ function Layout({ display, email }: { display: string; email: string }) {
       </aside>
 
       <main className="ws__main">
+        <div className="ws__mbar">
+          <button type="button" className="ws__burger" onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer} aria-controls="ws-menu">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" /></svg>
+          </button>
+          <Link to="/app" className="ws__mlogo" aria-label="Forged home"><img src="/dexa-logo-navy.png" alt="DEXA" /><span>Forged</span></Link>
+          <button type="button" className="ws__burger" onClick={() => setSearching(true)} aria-label="Search the workspace">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+          </button>
+        </div>
         <TopBar onSearch={() => setSearching(true)} />
-        <ErrorBoundary key={loc.pathname}><Outlet /></ErrorBoundary>
+        <ErrorBoundary key={loc.pathname}>
+          <Suspense fallback={<div className="pg"><Skeleton /></div>}><Outlet /></Suspense>
+        </ErrorBoundary>
       </main>
       <CommandPalette open={searching} onClose={() => setSearching(false)} />
     </div>

@@ -131,7 +131,7 @@ input:focus-visible { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(11, 1
   position: relative;
   border-radius: 22px;
   overflow: hidden;
-  background: #8b97a8 url('/login-bg.png') 76% center / cover no-repeat;
+  background: #8b97a8 url('/login-bg.jpg') 76% center / cover no-repeat;
   display: flex;
   align-items: flex-end;
 }
@@ -147,8 +147,13 @@ input:focus-visible { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(11, 1
 @media (max-width: 900px) {
   .login { grid-template-columns: 1fr; padding: 0; gap: 0; margin: 0; border-radius: 0; box-shadow: none; height: auto; min-height: 100vh; }
   .login__photo { display: none; }
-  .login__form { padding: 17px 17px 7px; }
+  .login { min-height: 100dvh; }
+  .login__form { padding: calc(17px + env(safe-area-inset-top, 0px)) max(17px, env(safe-area-inset-right, 0px)) calc(7px + env(safe-area-inset-bottom, 0px)) max(17px, env(safe-area-inset-left, 0px)); }
+  .login__main { padding: 26px 0; }
   .login__main h1 { font-size: 24px; }
+  /* 16px stops iPhones zooming into the field; taller targets for fingers */
+  .login input { font-size: 16px; min-height: 46px; }
+  .login button { min-height: 46px; }
 }
 
 /* ---- signed-in placeholder ---- */

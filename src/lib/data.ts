@@ -50,14 +50,16 @@ export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []) {
 
 /* ---------- team ---------- */
 
-export type TeamMember = { user_id: string; display_name: string }
+export type TeamMember = { user_id: string; display_name: string; role?: 'admin' | 'member' }
 let teamCache: Promise<TeamMember[]> | null = null
 
 function loadTeam(): Promise<TeamMember[]> {
   if (!teamCache) {
     teamCache = (async () => {
-      const res = await supabase.from('team').select('user_id, display_name')
-      return unwrap<TeamMember[]>(res) ?? []
+      // `role` exists once the per-person access migration has run; fall back to names only before that.
+      const withRole = await supabase.from('team').select('user_id, display_name, role')
+      if (!withRole.error) return (withRole.data as TeamMember[]) ?? []
+      return unwrap<TeamMember[]>(await supabase.from('team').select('user_id, display_name')) ?? []
     })().catch(() => {
       teamCache = null
       return [] as TeamMember[]
@@ -75,6 +77,20 @@ export function useTeam() {
   }, [])
   const name = (id?: string | null) => team.find((t) => t.user_id === id)?.display_name ?? ''
   return { team, name }
+}
+
+/** Whether the signed-in person sees everything (admin) or only their own tasks and tokens (member). */
+export function useRole() {
+  const { team } = useTeam()
+  const [id, setId] = useState<string | null>(null)
+  useEffect(() => {
+    let on = true
+    supabase.auth.getSession().then(({ data }) => { if (on) setId(data.session?.user.id ?? null) })
+    return () => { on = false }
+  }, [])
+  const me = team.find((t) => t.user_id === id)
+  // Before the access migration there is no role, so everyone sees everything as before.
+  return { isAdmin: !me || me.role !== 'member' }
 }
 
 /* ---------- files ---------- */

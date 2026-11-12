@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
-import { describe, fmtDate, unwrap, useLoad } from '../../lib/data'
+import { describe, fmtDate, unwrap, useLoad, useRole, useTeam } from '../../lib/data'
 import { sha256Hex } from '../../lib/hash'
 import { EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
@@ -8,7 +8,7 @@ import './pages.css'
 import './timeline.css'
 import { useFeedback } from '../../components/feedback'
 
-type Tok = { id: string; label: string; scope: string; created_at: string; last_used_at: string | null; revoked_at: string | null }
+type Tok = { id: string; label: string; scope: string; created_at: string; last_used_at: string | null; revoked_at: string | null; created_by?: string | null }
 
 /** A 256-bit random token. Only its SHA-256 hash is ever stored. */
 function newToken(prefix = 'fgl_') {
@@ -19,8 +19,10 @@ function newToken(prefix = 'fgl_') {
 export default function Settings() {
   const { confirm, toast } = useFeedback()
   const s = sectionByPath('settings')
+  const me = useRole()
+  const { name: who } = useTeam()
   const { data, error, loading, reload } = useLoad<Tok[]>(async () =>
-    unwrap<Tok[]>(await supabase.from('log_tokens').select('id, label, scope, created_at, last_used_at, revoked_at').order('created_at', { ascending: false })) ?? [])
+    unwrap<Tok[]>(await supabase.from('log_tokens').select('id, label, scope, created_at, last_used_at, revoked_at, created_by').order('created_at', { ascending: false })) ?? [])
   const [fresh, setFresh] = useState<string | null>(null)
   const [shown, setShown] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -81,7 +83,8 @@ export default function Settings() {
         </form>
         {err && <p className="formerr" role="alert">{err}</p>}
 
-        <h3 style={{ marginTop: 22 }}>Your tokens</h3>
+        <h3 style={{ marginTop: 22 }}>{me.isAdmin ? 'All tokens' : 'Your tokens'}</h3>
+        {!me.isAdmin && <p className="muted" style={{ marginBottom: 10 }}>You see and can revoke only the tokens you created. Create your own for your PC.</p>}
         <LoadState loading={loading && !data} error={error}>
           {data && data.length === 0 ? (
             <EmptyState title="No log tokens yet." text="Create one to let Claude Code write to the timeline." />
@@ -92,7 +95,7 @@ export default function Settings() {
                   <div className="item__main">
                     <p className="item__title">{t.label} <span className="chip">{t.scope === 'content' ? 'Content' : t.scope === 'read' ? 'Read' : 'Log'}</span></p>
                     <p className="item__meta">
-                      Created {fmtDate(t.created_at)} · {t.last_used_at ? `last used ${fmtDate(t.last_used_at)}` : 'never used'}
+                      Created {fmtDate(t.created_at)}{me.isAdmin && who(t.created_by) ? ` by ${who(t.created_by)}` : ''} ·{t.last_used_at ? `last used ${fmtDate(t.last_used_at)}` : 'never used'}
                       {t.revoked_at ? ` · revoked ${fmtDate(t.revoked_at)}` : ''}
                     </p>
                   </div>

@@ -1,0 +1,147 @@
+/* Mobile layout, motion and touch polish. Loaded after shell.css so it wins on equal specificity. */
+
+/* ---------- always ---------- */
+.ws a, .ws button, .ws summary, .ws select { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.ws img, .ws video, .ws canvas, .ws svg { max-width: 100%; }
+.ws__main { min-width: 0; -webkit-overflow-scrolling: touch; }
+.ws__scrim, .ws__mbar, .ws__close { display: none; }
+
+/* long lists skip painting rows that are off screen */
+.ws .rows > .item { content-visibility: auto; contain-intrinsic-size: auto 68px; }
+
+/* ---------- motion that applies everywhere ---------- */
+@keyframes rvPage { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rvFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rvLink { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@keyframes rvPop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: none; opacity: 1; } }
+
+/* a page fades in, then its parts rise one after the other */
+.ws .pg { animation: rvFade .28s ease backwards; }
+.ws .pg > :not(dialog) { animation: rvPage .5s cubic-bezier(.2, .7, .2, 1) backwards; }
+.ws .pg > :nth-child(2) { animation-delay: .05s; }
+.ws .pg > :nth-child(3) { animation-delay: .1s; }
+.ws .pg > :nth-child(4) { animation-delay: .15s; }
+.ws .pg > :nth-child(5) { animation-delay: .2s; }
+.ws .pg > :nth-child(n+6) { animation-delay: .24s; }
+/* list rows follow with a short stagger (first eight only) */
+.ws .rows > :nth-child(-n+8) { animation: rvPage .4s cubic-bezier(.2, .7, .2, 1) backwards; }
+.ws .rows > :nth-child(2) { animation-delay: .04s; }
+.ws .rows > :nth-child(3) { animation-delay: .08s; }
+.ws .rows > :nth-child(4) { animation-delay: .12s; }
+.ws .rows > :nth-child(5) { animation-delay: .16s; }
+.ws .rows > :nth-child(6) { animation-delay: .2s; }
+.ws .rows > :nth-child(7) { animation-delay: .24s; }
+.ws .rows > :nth-child(8) { animation-delay: .28s; }
+
+/* menu: an indicator that slides in on the active page, an icon nudge on hover, a pop for new badges */
+.ws .ws__link::before { content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: var(--ink); transform: scaleY(0); transition: transform .28s cubic-bezier(.2, .8, .2, 1); }
+.ws .ws__link.is-active::before { transform: scaleY(1); }
+.ws .ws__link svg { transition: color .15s ease, transform .2s cubic-bezier(.2, .8, .2, 1); }
+.ws .ws__link:hover svg { transform: translateX(2px); }
+.ws .ws__badge { animation: rvPop .4s cubic-bezier(.3, 1.5, .5, 1) backwards; }
+.ws .btn { transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .12s ease; }
+.ws .btn:active { transform: scale(.98); }
+
+/* ---------- desktop: the menu arrives once when the workspace opens ---------- */
+@media (min-width: 861px) {
+  .ws .ws__side { animation: rvFade .4s ease backwards; }
+  .ws .ws__link { animation: rvLink .42s cubic-bezier(.2, .7, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 32ms + 70ms); }
+  .ws .ws__user { animation: rvFade .5s ease .35s backwards; }
+}
+
+/* ---------- phones and small tablets ---------- */
+@media (max-width: 860px) {
+  .ws { display: block; margin: 0; min-height: 100dvh; height: auto; border-radius: 0; box-shadow: none; overflow: visible; background: #fff; transition: none; }
+
+  /* top bar */
+  .ws .ws__mbar {
+    position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 4px;
+    min-height: calc(54px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) max(6px, env(safe-area-inset-right, 0px)) 0 max(6px, env(safe-area-inset-left, 0px));
+    background: rgba(255, 255, 255, 0.92); -webkit-backdrop-filter: saturate(1.4) blur(12px); backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid #eef1f5;
+  }
+  .ws__burger, .ws__close {
+    flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); cursor: pointer;
+    transition: background .15s ease, transform .12s ease;
+  }
+  .ws__burger:active, .ws__close:active { background: #eceef2; transform: scale(.94); }
+  .ws__burger:focus-visible, .ws__close:focus-visible, .ws__mlogo:focus-visible { outline: 3px solid rgba(11, 13, 18, 0.45); outline-offset: 1px; }
+  .ws__mlogo { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; color: var(--ink); }
+  .ws__mlogo img { height: 22px; width: auto; display: block; }
+  .ws__mlogo span { padding: 2px 8px; border-radius: 6px; background: #f3f4f6; font-size: 11px; font-weight: 700; }
+
+  /* the menu becomes a drawer that slides in from the left */
+  .ws .ws__side {
+    position: fixed; z-index: 70; top: 0; bottom: 0; left: 0; width: min(86vw, 320px); height: 100dvh; background: #fff; border: 0; overflow: hidden;
+    transform: translateX(-104%); visibility: hidden; animation: none;
+    transition: transform .32s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .32s, box-shadow .32s ease;
+  }
+  .ws--drawer .ws__side { transform: none; visibility: visible; box-shadow: 0 0 0 1px rgba(13, 31, 74, .06), 24px 0 60px -20px rgba(6, 20, 64, .45); transition-delay: 0s; }
+  .ws .ws__sidein {
+    position: relative; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .ws .ws__top { margin: 0 0 14px; padding-right: 48px; }
+  .ws .ws__railbtn { display: none; }
+  .ws .ws__close { display: grid; position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); right: 8px; }
+  .ws .ws__search { display: flex; width: 100%; height: 46px; margin: 0 0 14px; padding: 0 12px; }
+  .ws .ws__search span { display: inline; }
+  .ws .ws__search kbd { display: none; }
+  .ws .ws__nav { order: 0; width: auto; display: grid; gap: 4px; overflow: visible; padding: 0; }
+  .ws .ws__group { display: block; }
+  .ws .ws__link { flex: initial; height: 46px; padding: 0 12px; font-size: 15px; }
+  .ws .ws__link svg { width: 20px; height: 20px; }
+  .ws .ws__user { margin: auto 0 0; padding: 14px 6px 2px; border-top: 1px solid #eef1f5; }
+  .ws .ws__who, .ws .ws__avatar { display: grid; }
+  .ws .ws__signout { width: 44px; height: 44px; }
+  /* links stagger in each time the drawer opens */
+  .ws--drawer .ws__link { animation: rvLink .38s cubic-bezier(.2, .7, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 28ms + 90ms); }
+
+  .ws .ws__scrim {
+    display: block; position: fixed; inset: 0; z-index: 65; width: 100%; padding: 0; border: 0; background: rgba(8, 12, 24, 0.5);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .28s ease;
+  }
+  .ws--drawer .ws__scrim { opacity: 1; pointer-events: auto; }
+
+  .ws .ws__main { height: auto; overflow: visible; }
+  /* the breadcrumb row scrolls away; search lives in the top bar */
+  .ws .tb { position: static; backdrop-filter: none; -webkit-backdrop-filter: none; background: #fff; }
+  .ws .tb__in { height: 46px; padding: 0 16px; }
+  .ws .tb__search { display: none; }
+
+  /* home hero fits under the bar */
+  .ws .wh { min-height: calc(100dvh - 54px - env(safe-area-inset-top, 0px)); padding: 24px 18px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .ws .wh__btn { height: 46px; }
+  .ws .wd { padding: 34px 16px calc(48px + env(safe-area-inset-bottom, 0px)); gap: 38px; }
+  .ws .wd__head { margin-bottom: 14px; }
+}
+
+@media (max-width: 700px) {
+  /* tighter, even spacing */
+  .ws .pg { padding: 16px 16px calc(40px + env(safe-area-inset-bottom, 0px)); }
+  .ws .pg__head { margin-bottom: 14px; padding-bottom: 14px; gap: 10px; }
+  .ws .pg__head p { font-size: 13.5px; }
+  .ws .panel { padding: 14px 14px; border-radius: 14px; }
+  .ws .panel + .panel { margin-top: 10px; }
+  .ws .item { padding: 12px; gap: 10px; }
+  .ws .rows { gap: 8px; }
+  /* 16px text in fields stops iPhones zooming in on focus */
+  .ws input, .ws select, .ws textarea { font-size: 16px; }
+  .ws .pg__action { width: 100%; }
+  .ws .pg__action .btn { flex: 1; }
+  .ws pre, .ws .pg table { max-width: 100%; overflow-x: auto; }
+  .ws .pg table { display: block; }
+  .ws .dlg__x { width: 44px; height: 44px; }
+}
+
+/* fingers need bigger targets than pointers */
+@media (pointer: coarse) {
+  .ws .btn { min-height: 44px; }
+  .ws .btn--sm { min-height: 40px; }
+  .ws .tb__crumbs a { padding: 8px 6px; margin: -8px -2px; }
+  .ws .chip { min-height: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws, .ws *, .ws *::before, .ws *::after { animation: none !important; transition: none !important; }
+  .ws .ws__side { transition: none !important; }
+}
