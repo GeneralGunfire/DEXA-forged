@@ -15,7 +15,9 @@ Options: --db <slug|estate>
          --since <date>    timeline only: entries from this date on
 Environment: FORGED_READ_URL, FORGED_READ_TOKEN`
 
-const fail = (m, code = 1) => { process.stderr.write(m + '\n'); process.exit(code) }
+class Done extends Error {}
+// Set the exit code and unwind instead of process.exit(), which makes Node on Windows print an assertion line after fetch.
+const fail = (m, code = 1) => { process.stderr.write(m + '\n'); process.exitCode = code; throw new Done() }
 const FLAGS = new Set(['db', 'what', 'limit', 'since'])
 
 function parse(argv) {
@@ -48,4 +50,4 @@ async function main() {
   if (res.status === 200 && typeof body.text === 'string') return process.stdout.write(body.text + '\n')
   fail(`Not read: ${body.error || `HTTP ${res.status}`}`, res.status === 422 ? 1 : 2)
 }
-main().catch(() => fail('forged-read failed unexpectedly.'))
+main().catch((e) => { if (!(e instanceof Done)) { process.stderr.write('forged-read failed unexpectedly.\n'); process.exitCode = 1 } })
