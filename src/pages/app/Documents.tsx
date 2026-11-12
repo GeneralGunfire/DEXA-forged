@@ -15,6 +15,7 @@ import { useOpenFromQuery } from '../../components/nav'
 export type DocRow = {
   id: string; name: string; path: string; mime: string | null; size: number | null
   database_id: string | null; created_by: string; created_at: string; folder?: string
+  description?: string; reason?: string; tags?: string[]; made_by?: string; is_current?: boolean
 }
 
 const stripExt = (n: string) => n.replace(/\.[^.]+$/, '')
@@ -36,7 +37,7 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
   const [msg, setMsg] = useState<string | null>(null)
 
   const folders = [...new Set((data ?? []).map((d) => d.folder ?? '').filter(Boolean))].sort((a, b) => a.localeCompare(b))
-  const rows = (data ?? []).filter((d) => `${d.name} ${d.folder ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
+  const rows = (data ?? []).filter((d) => d.is_current !== false).filter((d) => `${d.name} ${d.folder ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
 
   const [viewing, setViewing] = useState<{ name: string; path: string; mime: string | null } | null>(null)
   async function open(d: { name: string; path: string; mime: string | null }) {
@@ -96,8 +97,10 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
                 <div className="item__main">
                   <p className="item__title" title={d.name}>{d.name}</p>
                   <p className="item__meta">
-                    {[fmtBytes(d.size), fmtDate(d.created_at), who(d.created_by) && `by ${who(d.created_by)}`].filter(Boolean).join(' · ')}
+                    {[fmtBytes(d.size), fmtDate(d.created_at), (d.made_by || who(d.created_by)) && `by ${d.made_by || who(d.created_by)}`].filter(Boolean).join(' · ')}
                   </p>
+                  {d.reason && <p className="item__meta" title={d.reason}>Reason: {d.reason}</p>}
+                  {!!d.tags?.length && <p className="item__tags">{d.tags.map((t) => <span className="chip2" key={t}>{t}</span>)}</p>}
                 </div>
                 <div className="item__acts">
                   <button type="button" className="btn btn--sm" onClick={() => open(d)}>View</button>

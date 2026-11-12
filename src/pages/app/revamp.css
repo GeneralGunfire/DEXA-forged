@@ -142,9 +142,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ws, .ws *, .ws *::before, .ws *::after { animation: none !important; transition: none !important; }
-  .ws .ws__side { transition: none !important; }
+  :root:not([data-motion="on"]) .ws, :root:not([data-motion="on"]) .ws *, :root:not([data-motion="on"]) .ws *::before, :root:not([data-motion="on"]) .ws *::after { animation: none !important; transition: none !important; }
 }
+:root[data-motion="off"] .ws, :root[data-motion="off"] .ws *, :root[data-motion="off"] .ws *::before, :root[data-motion="off"] .ws *::after { animation: none !important; transition: none !important; }
 
 /* ---------- desktop: a smaller app panel floating on the page, and a sidebar that animates when it collapses ---------- */
 @media (min-width: 861px) {
@@ -224,3 +224,6 @@
 .ws .fold > .rows { padding: 0 12px 12px; }
 @keyframes foldIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .ws .fold[open] > :not(summary) { animation: foldIn .28s cubic-bezier(.2, .7, .2, 1); }
+
+/* tags under a document */
+.ws .item__tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }

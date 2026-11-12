@@ -6,6 +6,7 @@ import { EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { sectionByPath } from './sections'
 import './pages.css'
 import './timeline.css'
+import { getMotion, setMotion, deviceReducesMotion, type Motion } from '../../lib/motion'
 import { useFeedback } from '../../components/feedback'
 
 type Tok = { id: string; label: string; scope: string; created_at: string; last_used_at: string | null; revoked_at: string | null; created_by?: string | null }
@@ -14,6 +15,29 @@ type Tok = { id: string; label: string; scope: string; created_at: string; last_
 function newToken(prefix = 'fgl_') {
   const b = crypto.getRandomValues(new Uint8Array(32))
   return prefix + btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function MotionPanel() {
+  const [m, setM] = useState<Motion>(getMotion())
+  const reduced = deviceReducesMotion()
+  const opts: { id: Motion; label: string }[] = [{ id: 'auto', label: 'Follow my device' }, { id: 'on', label: 'Always on' }, { id: 'off', label: 'Off' }]
+  return (
+    <section className="panel">
+      <h3>Animations</h3>
+      <p className="muted" style={{ marginBottom: 12 }}>
+        {reduced && m === 'auto'
+          ? 'Your device is asking apps to reduce motion, so animations are off. Choose "Always on" to see them anyway.'
+          : 'Menus, pages and cards move gently. Choose how much you want to see.'}
+      </p>
+      <div className="cs__modes" role="group" aria-label="Animations" style={{ maxWidth: 560 }}>
+        {opts.map((o) => (
+          <button key={o.id} type="button" className={`cs__mode${m === o.id ? ' is-on' : ''}`} aria-pressed={m === o.id} onClick={() => { setMotion(o.id); setM(o.id) }}>
+            <b>{o.label}</b>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 export default function Settings() {
@@ -34,12 +58,13 @@ export default function Settings() {
     ev.preventDefault()
     const form = ev.currentTarget
     const submitter = (ev.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
-    const scope = submitter?.value === 'content' ? 'content' : submitter?.value === 'read' ? 'read' : 'log'
+    const v = submitter?.value
+    const scope = v === 'content' || v === 'read' || v === 'docs' ? v : 'log'
     const label = String(new FormData(form).get('label') ?? '').trim()
     if (!label) return setErr('Name the token, for example "Phase 2 Claude Code".')
     setBusy(true)
     try {
-      const token = newToken(scope === 'content' ? 'fgc_' : scope === 'read' ? 'fgr_' : 'fgl_')
+      const token = newToken({ log: 'fgl_', content: 'fgc_', read: 'fgr_', docs: 'fgd_' }[scope])
       unwrap(await supabase.from('log_tokens').insert({ label, scope, token_hash: await sha256Hex(token) }))
       setFresh(token); setShown(false); setCopied(false); setErr(null); form.reset(); reload()
     } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
@@ -60,7 +85,7 @@ export default function Settings() {
       <section className="panel">
         <h3>Log access</h3>
         <p className="muted" style={{ marginBottom: 14 }}>
-          A log token lets Claude Code and scripts add timeline entries without signing in. A content token lets it write the in-depth Background and Build record sections. Each can only write its own kind of content; neither can read or delete anything. A read token lets Claude Code read a record's context (background, build record, timeline, estate pages and document names) and cannot change anything.
+          A log token lets Claude Code and scripts add timeline entries without signing in. A content token lets it write the in-depth Background and Build record sections. Each can only write its own kind of content; neither can read or delete anything. A read token lets Claude Code read a record's context (background, build record, timeline, estate pages and document names) and cannot change anything. A docs token lets Claude Code add, find and describe documents (with a folder, tags and a reason); it can never delete a document or change one in place.
         </p>
 
         {fresh && (
@@ -80,6 +105,7 @@ export default function Settings() {
           <button type="submit" name="scope" value="log" className="btn btn--dark" disabled={busy} style={{ marginBottom: 14 }}>{busy ? 'Creating…' : 'Create log token'}</button>
           <button type="submit" name="scope" value="content" className="btn" disabled={busy} style={{ marginBottom: 14 }}>Create content token</button>
           <button type="submit" name="scope" value="read" className="btn" disabled={busy} style={{ marginBottom: 14 }}>Create read token</button>
+          <button type="submit" name="scope" value="docs" className="btn" disabled={busy} style={{ marginBottom: 14 }}>Create docs token</button>
         </form>
         {err && <p className="formerr" role="alert">{err}</p>}
 
@@ -93,7 +119,7 @@ export default function Settings() {
               {(data ?? []).map((t) => (
                 <div className={`tok${t.revoked_at ? ' is-revoked' : ''}`} key={t.id}>
                   <div className="item__main">
-                    <p className="item__title">{t.label} <span className="chip">{t.scope === 'content' ? 'Content' : t.scope === 'read' ? 'Read' : 'Log'}</span></p>
+                    <p className="item__title">{t.label} <span className="chip">{({ log: 'Log', content: 'Content', read: 'Read', docs: 'Docs' } as Record<string, string>)[t.scope] ?? t.scope}</span></p>
                     <p className="item__meta">
                       Created {fmtDate(t.created_at)}{me.isAdmin && who(t.created_by) ? ` by ${who(t.created_by)}` : ''} ·{t.last_used_at ? `last used ${fmtDate(t.last_used_at)}` : 'never used'}
                       {t.revoked_at ? ` · revoked ${fmtDate(t.revoked_at)}` : ''}
@@ -107,6 +133,8 @@ export default function Settings() {
         </LoadState>
       </section>
 
+      <MotionPanel />
+
       <section className="panel">
         <h3>Set up your computer</h3>
         <p className="muted">Set these two environment variables, then run <code>forged-log</code>. Details are in <code>docs/forged-log.md</code>.</p>
@@ -119,6 +147,9 @@ export default function Settings() {
         <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_READ_URL</b></p>
         <code style={{ display: 'block', overflowWrap: 'anywhere' }}>{endpoint.replace('log-ingest', 'forge-read')}</code>
         <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_READ_TOKEN</b> is the read token. Read tokens are used with <code>forged-read</code>; details are in <code>docs/forged-read.md</code>.</p>
+        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_DOCS_URL</b></p>
+        <code style={{ display: 'block', overflowWrap: 'anywhere' }}>{endpoint.replace('log-ingest', 'forge-docs')}</code>
+        <p style={{ margin: '10px 0 0', fontSize: 13 }}><b>FORGED_DOCS_TOKEN</b> is the docs token. Used with <code>forged-docs</code>; details are in <code>docs/forged-docs.md</code>.</p>
       </section>
     </div>
   )

@@ -15,6 +15,7 @@ import { useFeedback } from '../../components/feedback'
 type Doc = {
   id: string; database_id: string; name: string; description: string; document_date: string
   path: string; mime: string | null; size: number | null; is_current: boolean
+  reason?: string; tags?: string[]; made_by?: string
   replaces_id: string | null; entry_id: string | null; created_at: string
 }
 
@@ -95,7 +96,9 @@ export function DbDocuments({ databaseId }: { databaseId: string }) {
                     <span className="item__ico">{fileKind(d.mime, d.path).toUpperCase().slice(0, 4)}</span>
                     <div className="item__main">
                       <p className="item__title" title={d.name}>{d.name}</p>
-                      <p className="item__meta">{[fmtDate(d.document_date), fmtBytes(d.size), ext(d).toUpperCase()].filter(Boolean).join(' · ')}</p>
+                      <p className="item__meta">{[fmtDate(d.document_date), fmtBytes(d.size), ext(d).toUpperCase(), d.made_by && `by ${d.made_by}`].filter(Boolean).join(' · ')}</p>
+                      {d.reason && <p className="item__meta" title={d.reason}>Reason: {d.reason}</p>}
+                      {!!d.tags?.length && <p className="item__tags">{d.tags.map((t) => <span className="chip2" key={t}>{t}</span>)}</p>}
                     </div>
                     <div className="item__acts">
                       {previewable(d) && <button type="button" className="btn btn--sm btn--dark" onClick={() => setPreview(d)}>View</button>}

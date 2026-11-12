@@ -8,7 +8,8 @@ Forged is the internal admin site (React, Vite, Supabase, Vercel). It holds no p
   - At the end of a session log one Note: what was done, what is open, what comes next. Run `node scripts/forged-log --flush`.
   - Tell the user in one line each time you log an Error or a Fix.
 - Write in-depth Background and Build record content with `scripts/forged-content` (see `docs/forged-content.md`). It reads `FORGED_CONTENT_URL` and `FORGED_CONTENT_TOKEN`.
-- If a document on a record is made out of date by your work, log a Note saying which and why. Do not edit the document.
+- The timeline is the main record of everything you do. Documents are made NEW, never edited: if your work makes a document out of date, make the corrected document as a new file and add it with `scripts/forged-docs` (see `docs/forged-docs.md`; it reads `FORGED_DOCS_URL` and `FORGED_DOCS_TOKEN`) using `--replaces <id of the current one>`, a `--reason`, `--tags` such as `update`, and `--entry <timeline entry id>`. The old version stays as history. Never alter an existing document or file in place, and log a Note on the timeline saying which document changed and why.
+- Read context from the site with `scripts/forged-read` (see `docs/forged-read.md`). It reads `FORGED_READ_URL` and `FORGED_READ_TOKEN`.
 
 ## Never
 - Log or write patient rows, SA ID numbers, names, phone numbers, emails, passwords, tokens or connection strings. The site rejects them; fix the text and send again. Never try to get around the check.

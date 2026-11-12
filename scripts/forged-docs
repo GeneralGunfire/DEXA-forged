@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+/**
+ * forged-docs: list, fetch, add and describe documents in Forged. No dependencies (Node 18+).
+ * Endpoint and token come ONLY from the environment (FORGED_DOCS_URL, FORGED_DOCS_TOKEN) and are never printed.
+ * It cannot delete anything and cannot change a file in place: a changed document is uploaded as a NEW version
+ * (--replaces <id>), which keeps the old one as history. Files are only written to disk by `get --out <folder>`.
+ */
+import { readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs'
+import { basename, join, resolve } from 'node:path'
+
+const USAGE = `Usage:
+  forged-docs list   [--db <slug|estate>] [--folder <name>] [--history] [--limit <1-200>]
+  forged-docs get    <id> [--out <folder>]            (shows details; with --out also saves the file there)
+  forged-docs upload <file> --db <slug|estate> --reason "<why this is being added>"
+                     [--name <title>] [--folder <name>] [--tags a,b] [--description "<text>"]
+                     [--date YYYY-MM-DD] [--replaces <id>] [--entry <timeline entry id>] [--made-by <who>]
+  forged-docs update <id> [--name ..] [--folder ..] [--tags a,b] [--reason ..] [--description ..] [--date ..]
+
+Ids look like d:<uuid> (a database's document) or g:<uuid> (the general Documents tab). Use "list" to find them.
+A changed document is NEW: upload it with --replaces <id of the current one>. Nothing is ever deleted or overwritten.
+Environment: FORGED_DOCS_URL, FORGED_DOCS_TOKEN`
+
+class Done extends Error {}
+const fail = (m, code = 1) => { process.stderr.write(m + '\n'); process.exitCode = code; throw new Done() }
+const FLAGS = { db: 1, folder: 1, history: 0, limit: 1, out: 1, reason: 1, name: 1, tags: 1, description: 1, date: 1, replaces: 1, entry: 1, 'made-by': 1 }
+
+function parse(argv) {
+  const pos = [], o = {}
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--help' || a === '-h') { process.stdout.write(USAGE + '\n'); process.exitCode = 0; throw new Done() }
+    const m = a.match(/^--([a-z-]+)(?:=(.*))?$/)
+    if (!m) { pos.push(a); continue }
+    if (!(m[1] in FLAGS)) fail(`Unknown option --${m[1]}.\n${USAGE}`)
+    if (FLAGS[m[1]] === 0) { o[m[1]] = true; continue }
+    const v = m[2] !== undefined ? m[2] : argv[++i]
+    if (v === undefined) fail(`--${m[1]} needs a value.`)
+    o[m[1]] = v
+  }
+  return { pos, o }
+}
+
+async function call(payload) {
+  const url = process.env.FORGED_DOCS_URL, token = process.env.FORGED_DOCS_TOKEN
+  if (!url || !token) fail('Set FORGED_DOCS_URL and FORGED_DOCS_TOKEN in the environment first.')
+  let res
+  try {
+    res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(payload), signal: AbortSignal.timeout(60000) })
+  } catch { fail('Could not reach the site. Nothing was changed.', 2) }
+  let body = {}
+  try { body = await res.json() } catch { /* not json */ }
+  if (res.status >= 200 && res.status < 300) return body
+  fail(`Not done: ${body.error || `HTTP ${res.status}`}${body.existing ? ` (existing: ${body.existing})` : ''}`, res.status === 422 || res.status === 409 ? 1 : 2)
+}
+
+const line = (d) => `${d.ref}  ${d.db}${d.folder ? ` / ${d.folder}` : ''}  "${d.name}"  ${d.size ?? '?'} bytes  ${String(d.document_date ?? d.created_at).slice(0, 10)}  ${d.current ? 'current' : 'older version'}${d.tags?.length ? `  tags: ${d.tags.join(', ')}` : ''}${d.reason ? `\n      reason: ${d.reason}` : ''}${d.made_by ? `  (made by ${d.made_by})` : ''}`
+const tags = (s) => (s === undefined ? undefined : s.split(',').map((t) => t.trim()).filter(Boolean))
+
+async function main() {
+  const { pos, o } = parse(process.argv.slice(2))
+  const cmd = pos[0]
+  if (!cmd) fail(USAGE)
+
+  if (cmd === 'list') {
+    const r = await call({ action: 'list', ...(o.db && { db: o.db }), ...(o.folder && { folder: o.folder }), ...(o.history && { history: true }), ...(o.limit && { limit: Number(o.limit) }) })
+    process.stdout.write(r.items.length ? r.items.map(line).join('\n') + '\n' : 'No documents.\n')
+    if (r.truncated) process.stdout.write('(more exist; narrow with --db, --folder or a smaller --limit)\n')
+    return
+  }
+  if (cmd === 'get') {
+    if (!pos[1]) fail('get needs an id (use list to find it).')
+    const r = await call({ action: 'get', id: pos[1], content: !!o.out })
+    process.stdout.write(line(r.document) + '\n')
+    if (o.out) {
+      const dir = resolve(o.out); mkdirSync(dir, { recursive: true })
+      const file = join(dir, (r.document.name.replace(/[^\w.-]+/g, '_') || 'document') + (r.document.mime === 'application/pdf' ? '.pdf' : r.document.mime === 'image/png' ? '.png' : r.document.mime === 'image/jpeg' ? '.jpg' : '.docx'))
+      writeFileSync(file, Buffer.from(r.content_base64, 'base64'))
+      process.stdout.write(`Saved to ${file}\nsha256 ${r.sha256}\n`)
+    }
+    return
+  }
+  if (cmd === 'upload') {
+    const file = pos[1]
+    if (!file) fail('upload needs a file path.')
+    if (!o.db) fail('upload needs --db <slug|estate>.')
+    if (!o.reason) fail('upload needs --reason "<why this is being added>".')
+    let size; try { size = statSync(file).size } catch { fail(`Cannot read ${file}.`) }
+    if (size > 4_000_000) fail('That file is over 4 MB, which is the limit.')
+    const r = await call({
+      action: 'upload', db: o.db, filename: basename(file), content_base64: readFileSync(file).toString('base64'), reason: o.reason,
+      ...(o.name && { name: o.name }), ...(o.folder && { folder: o.folder }), ...(o.tags && { tags: tags(o.tags) }), ...(o.description && { description: o.description }),
+      ...(o.date && { document_date: o.date }), ...(o.replaces && { replaces: o.replaces }), ...(o.entry && { entry_id: o.entry }), ...(o['made-by'] && { made_by: o['made-by'] }),
+    })
+    process.stdout.write(`Uploaded ${r.id}${r.replaced ? ` (new version; replaces ${r.replaced}, which is kept as history)` : ''}\n`)
+    return
+  }
+  if (cmd === 'update') {
+    if (!pos[1]) fail('update needs an id.')
+    const r = await call({
+      action: 'update', id: pos[1],
+      ...(o.name && { name: o.name }), ...(o.folder !== undefined && { folder: o.folder }), ...(o.tags !== undefined && { tags: tags(o.tags) }),
+      ...(o.reason && { reason: o.reason }), ...(o.description !== undefined && { description: o.description }), ...(o.date && { document_date: o.date }),
+    })
+    process.stdout.write(`Updated ${r.id}: ${r.updated.join(', ')}\n`)
+    return
+  }
+  fail(`Unknown command "${cmd}".\n${USAGE}`)
+}
+main().catch((e) => { if (!(e instanceof Done)) { process.stderr.write('forged-docs failed unexpectedly.\n'); process.exitCode = 1 } })
