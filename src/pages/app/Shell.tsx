@@ -9,6 +9,7 @@ import { SECTIONS } from './sections'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
 import { FeedbackProvider } from '../../components/feedback'
 import { WaveBand } from '../../components/charts'
+import { HeroField } from '../../components/HeroField'
 import { CrumbProvider, TopBar } from '../../components/nav'
 import { CommandPalette } from '../../components/CommandPalette'
 import { Dashboard } from './Dashboard'
@@ -71,6 +72,7 @@ function Home({ name }: { name: string }) {
   return (
     <>
       <section className="wh" aria-label="Welcome">
+        <HeroField />
         <div className="wh__content">
           <p className="wh__kicker">DEXA Forged</p>
           <h1>Welcome back, {name}.</h1>

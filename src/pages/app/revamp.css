@@ -145,3 +145,17 @@
   .ws, .ws *, .ws *::before, .ws *::after { animation: none !important; transition: none !important; }
   .ws .ws__side { transition: none !important; }
 }
+
+/* ---------- home background (HeroField) ---------- */
+.hf { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; animation: rvFade 1.2s ease backwards; }
+.hf__logo { filter: brightness(0) invert(1); }
+@keyframes hfPulse { from { stroke-dashoffset: 100; opacity: 0; } 10% { opacity: .9; } 85% { opacity: .9; } to { stroke-dashoffset: 0; opacity: 0; } }
+.hf__pulse { stroke-dasharray: 3 97; stroke-dashoffset: 100; opacity: 0; animation: hfPulse 6s cubic-bezier(.45, 0, .55, 1) infinite; }
+@keyframes hfTwinkle { 0%, 100% { opacity: .95; } 50% { opacity: .45; } }
+.hf__node { animation: hfTwinkle 4s ease-in-out infinite; }
+@keyframes hfHalo { from { transform: scale(1); opacity: .55; } to { transform: scale(1.9); opacity: 0; } }
+.hf__halo { transform-box: fill-box; transform-origin: center; animation: hfHalo 3.2s ease-out infinite; }
+@keyframes hfBreathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.hf__ring--1 { animation: hfBreathe 7s ease-in-out infinite; }
+.hf__ring--3 { animation: hfBreathe 9s ease-in-out 2s infinite; }
+@media (prefers-reduced-motion: reduce) { .hf__pulse { opacity: 0; } }
