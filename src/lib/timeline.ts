@@ -2,7 +2,10 @@ export const TYPES = ['Action', 'Error', 'Response', 'Fix', 'Decision', 'Note'] 
 export type EntryType = (typeof TYPES)[number]
 export const AUTHORS = ['Rajen', 'Huzayfa', 'Claude Code'] as const
 export const STATUSES = ['Open', 'Resolved'] as const
-export const PHASES = ['1', '2', 'Other'] as const
+// '1-2' is the stage between a finished Phase 1 and the start of Phase 2: work on Forged itself after the databases were closed.
+export const PHASES = ['1', '1-2', '2', 'Other'] as const
+export const MAIN_PHASES: readonly string[] = ['1', '1-2', '2']
+export const phaseLabel = (p: string) => (p === '1-2' ? 'Between Phases 1 and 2' : MAIN_PHASES.includes(p) ? `Phase ${p}` : p)
 
 export type Entry = {
   id: string
@@ -24,7 +27,7 @@ export type Entry = {
 export type Filters = {
   database: string      // '' = all, 'estate' = whole estate, otherwise a database id
   type: string
-  phase: string         // '', '1', '2', 'Other'
+  phase: string         // '', '1', '1-2', '2', 'Other'
   status: string
   author: string
   from: string          // yyyy-mm-dd
@@ -49,7 +52,7 @@ export function filterEntries(entries: Entry[], f: Filters): Entry[] {
     if (f.database === 'estate' ? e.database_id !== null : f.database && e.database_id !== f.database) return false
     if (f.type && e.type !== f.type) return false
     if (f.phase) {
-      const main = e.phase === '1' || e.phase === '2'
+      const main = MAIN_PHASES.includes(e.phase)
       if (f.phase === 'Other' ? main : e.phase !== f.phase) return false
     }
     if (f.status && e.status !== f.status) return false

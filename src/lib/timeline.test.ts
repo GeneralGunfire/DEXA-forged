@@ -55,7 +55,7 @@ describe('filterEntries', () => {
     expect(ids({ author: 'Claude Code' })).toEqual(['1'])
     expect(ids({ author: 'team' })).toEqual(['2', '3'])
   })
-  it('by phase, with Other meaning anything but 1 and 2', () => {
+  it('by phase, with Other meaning anything but 1, between 1 and 2, and 2', () => {
     expect(ids({ phase: '2' })).toEqual(['1'])
     expect(ids({ phase: 'Other' })).toEqual(['3'])
   })

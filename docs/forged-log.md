@@ -32,7 +32,7 @@ It prints only the new entry id. Use that id as `--parent` for replies. On Windo
 | --- | --- |
 | `--db` | Database slug (for example `public_hospital`, `nappi`, `icd10`) or `estate` for the whole estate. A reply with `--parent` and no `--db` uses its parent's database. |
 | `--type` | Action, Error, Response, Fix, Decision or Note. Default Note. |
-| `--phase` | `1`, `2` or any short text. Default 1. |
+| `--phase` | `1`, `1-2` (between Phases 1 and 2: work on Forged itself after Phase 1 closed), `2` or any short text. Default 1. |
 | `--title`, `--summary` | Required title (one line); summary in plain words for a non-technical reader. |
 | `--detail`, `--detail-file` | Technical text: error messages, counts, timings. |
 | `--status` | Open or Resolved. Errors only; default Open. |

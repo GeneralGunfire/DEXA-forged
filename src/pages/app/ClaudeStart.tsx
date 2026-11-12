@@ -65,7 +65,7 @@ At the end of the session put one closing Note on the pending list (done, open, 
   const forged = `
 
 THIS SESSION: WORKING ON FORGED
-- Log to the general timeline: --db estate. Propose an Action before substantial work, then Errors, Responses, Fixes, Decisions and worthwhile result Notes as they happen.
+- Log to the general timeline: --db estate --phase 1-2. Phase 1 (the databases) is finished, and work on Forged itself since then is "between Phases 1 and 2", not Phase 2. Propose an Action before substantial work, then Errors, Responses, Fixes, Decisions and worthwhile result Notes as they happen.
 - Work on a branch, run npx vitest run, npx tsc -b and npm run build before committing, and give the user the Vercel preview link. Push to main only when told.
 - If the work makes something a record says out of date, put a Note or a section update on the pending list. Routine fixes go on the timeline only. Only a big change that makes a document wrong gets a NEW version of that document (old-versus-new wording first); never edit an existing document or file in place.`
 
@@ -75,7 +75,7 @@ THIS SESSION: WORKING ON FORGED
 THIS SESSION: PHASE 2 ON ${phase2Db ? `THE DATABASE "${phase2Db}"` : 'ONE DATABASE (the user will name it)'}
 - Start Phase 2 work only because the user has said so in this session.
 - First read the record: forged-read --db ${slug} --what overview, then background, build and timeline. Say what you found before changing anything.
-- Log to that database: --db ${slug} --phase 2. Propose an Action first, then Errors, Responses, Fixes, Decisions and Notes. Also log on --db estate when the work affects the whole estate.
+- Log to that database: --db ${slug} --phase 2 (Phase 1 is finished; only real Phase 2 work uses 2). Propose an Action first, then Errors, Responses, Fixes, Decisions and Notes. Also log on --db estate when the work affects the whole estate.
 - If the work changes what the Background or Build record says, propose the section update with an old-versus-new summary. Routine fixes go on the timeline only. Only a big change that makes one of the database's documents wrong gets a new version of it with forged-docs (--db ${slug} --replaces <current id> --reason ... --tags update). Every figure must come from a query or file read in this session; otherwise write "not established".
 - The databases stay read-only unless the user tells you otherwise for this session.`
 

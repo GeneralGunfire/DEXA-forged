@@ -5,7 +5,7 @@ import { describe, unwrap, useLoad, useMe, useTeam } from '../../lib/data'
 import { checkRedaction } from '../../lib/redact'
 import {
   activeFilterCount, AUTHORS, buildThreads, countNodes, dayKey, filterEntries, fixesFor, fmtDay, fmtTime, fromLocalInput, NO_FILTERS,
-  PHASES, STATUSES, toLocalInput, TYPES, type Entry, type EntryType, type Filters, type Node as TNode,
+  PHASES, MAIN_PHASES, phaseLabel, STATUSES, toLocalInput, TYPES, type Entry, type EntryType, type Filters, type Node as TNode,
 } from '../../lib/timeline'
 import { Dialog, EmptyState, Field, LoadState, PageHead } from '../../components/ui'
 import { ContentSections } from '../../components/ContentSections'
@@ -213,7 +213,7 @@ export function TimelineView({ databaseId }: { databaseId?: string }) {
         )}
         <label><span>Phase</span>
           <select value={filters.phase} onChange={(e) => set('phase', e.target.value)}>
-            <option value="">All phases</option>{PHASES.map((p) => <option key={p} value={p}>{p === 'Other' ? 'Other' : `Phase ${p}`}</option>)}
+            <option value="">All phases</option>{PHASES.map((p) => <option key={p} value={p}>{p === 'Other' ? 'Other' : phaseLabel(p)}</option>)}
           </select>
         </label>
         <label><span>Status</span>
@@ -307,7 +307,7 @@ function TlRow({
               {e.type === 'Error' && e.status && <span className={`tl-status tl-status--${e.status.toLowerCase()}`}>{e.status}</span>}
               <span className={`tl-by${robot ? ' tl-by--cc' : ''}`}>{e.author}</span>
               {dbName !== null && <span className="tl-dbtag">{dbName}</span>}
-              <span className="tl-phase">{/^[12]$/.test(e.phase) ? `Phase ${e.phase}` : e.phase}</span>
+              <span className="tl-phase">{phaseLabel(e.phase)}</span>
             </span>
             <span className="tl-title">{e.title}</span>
             {e.summary && <span className={`tl-sum${open ? '' : ' is-clamped'}`}>{e.summary}</span>}
@@ -412,8 +412,8 @@ function EntryForm({
   const start = entry ?? preset ?? {}
   const [dbId, setDbId] = useState<string>(entry ? entry.database_id ?? '' : fixedDb ?? start.database_id ?? '')
   const [type, setType] = useState<EntryType>((start.type as EntryType) ?? 'Note')
-  const [phaseSel, setPhaseSel] = useState(() => (!start.phase || /^[12]$/.test(start.phase) ? start.phase ?? '1' : 'Other'))
-  const [phaseOther, setPhaseOther] = useState(() => (start.phase && !/^[12]$/.test(start.phase) ? start.phase : ''))
+  const [phaseSel, setPhaseSel] = useState(() => (!start.phase || MAIN_PHASES.includes(start.phase) ? start.phase ?? '1' : 'Other'))
+  const [phaseOther, setPhaseOther] = useState(() => (start.phase && !MAIN_PHASES.includes(start.phase) ? start.phase : ''))
   const [parentId, setParentId] = useState(start.parent_id ?? '')
   const [resolve, setResolve] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -495,7 +495,7 @@ function EntryForm({
       <div className="row2">
         <Field label="Phase">
           <select value={phaseSel} onChange={(e) => setPhaseSel(e.target.value)}>
-            {PHASES.map((p) => <option key={p} value={p}>{p === 'Other' ? 'Other' : `Phase ${p}`}</option>)}
+            {PHASES.map((p) => <option key={p} value={p}>{p === 'Other' ? 'Other' : phaseLabel(p)}</option>)}
           </select>
         </Field>
         {phaseSel === 'Other'

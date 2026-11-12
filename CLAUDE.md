@@ -4,7 +4,7 @@ Forged is the internal admin site (React, Vite, Supabase, Vercel). It holds no p
 
 ## Keeping the site up to date
 - Log what you do on the timeline with `scripts/forged-log` (see `docs/forged-log.md`). It reads `FORGED_LOG_URL` and `FORGED_LOG_TOKEN` from the environment. Never print them.
-  - Before starting work, log one Action. Log every error as an Error (status Open) with the exact message in `--detail`, then the attempt as a Response and the fix as a Fix, both with `--parent <error id>` (add `--resolve` on the Fix). Log decisions as Decision and results worth keeping as Note.
+  - Before starting work, log one Action. Log every error as an Error (status Open) with the exact message in `--detail`, then the attempt as a Response and the fix as a Fix, both with `--parent <error id>` (add `--resolve` on the Fix). Log decisions as Decision and results worth keeping as Note. Phase 1 (the databases) is finished: work on Forged itself since then uses `--phase 1-2` ("between Phases 1 and 2"), and only real Phase 2 work (logins, connectors, mappings, adapters, the gateway) uses `--phase 2`.
   - At the end of a session log one Note: what was done, what is open, what comes next. Run `node scripts/forged-log --flush`.
   - Tell the user in one line each time you log an Error or a Fix.
 - Write in-depth Background and Build record content with `scripts/forged-content` (see `docs/forged-content.md`). It reads `FORGED_CONTENT_URL` and `FORGED_CONTENT_TOKEN`.
