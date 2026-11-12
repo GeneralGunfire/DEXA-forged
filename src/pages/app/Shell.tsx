@@ -21,6 +21,7 @@ import Feedback from './Feedback'
 import Reports from './Reports'
 import GlobalTimeline from './Timeline'
 import Settings from './Settings'
+import ClaudeStart from './ClaudeStart'
 import './shell.css'
 
 const homeIcon = (
@@ -134,7 +135,7 @@ function Home({ name }: { name: string }) {
 const NAV = [
   { label: '', items: ['home', 'databases', 'timeline', 'documents'] },
   { label: 'Team', items: ['messages', 'schedule', 'feedback'] },
-  { label: 'Manage', items: ['reports', 'branding', 'settings'] },
+  { label: 'Manage', items: ['reports', 'branding', 'claude-start', 'settings'] },
 ]
 
 /** Small live counts shown beside a menu item: open errors, overdue tasks, unread feedback. */
@@ -260,6 +261,7 @@ export default function Workspace({ session }: { session: Session }) {
         <Route path="feedback" element={<Feedback />} />
         <Route path="reports" element={<Reports />} />
         <Route path="timeline" element={<GlobalTimeline />} />
+        <Route path="claude-start" element={<ClaudeStart />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>

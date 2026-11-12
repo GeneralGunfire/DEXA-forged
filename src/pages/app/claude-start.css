@@ -1,0 +1,11 @@
+/* Claude Code start prompt */
+.cs__modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.cs__mode { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border: 1px solid #dfe4ea; border-radius: 12px; background: #fff; color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.cs__mode b { font-size: 14px; }
+.cs__mode span { font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+.cs__mode:hover { border-color: #aab4c0; }
+.cs__mode.is-on { border-color: #111; background: #f6f8fa; box-shadow: inset 0 0 0 1px #111; }
+.cs__mode:focus-visible, .cs__text:focus-visible, .cs__pick select:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
+.cs__pick { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; max-width: 360px; font-size: 13px; font-weight: 600; }
+.cs__pick select { padding: 9px 10px; border: 1px solid #dfe4ea; border-radius: 10px; font: inherit; font-weight: 400; background: #fff; }
+.cs__text { margin: 0; max-height: 460px; overflow: auto; padding: 14px 16px; border: 1px solid #dfe4ea; border-radius: 12px; background: #f6f8fa; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
