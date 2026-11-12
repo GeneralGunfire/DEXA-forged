@@ -98,13 +98,7 @@ export function DatabaseBoard() {
                     const st = counts.data?.tl[d.id]
                     return (
                       <Link key={d.id} to={`/app/databases/${d.id}`} className="dbcard2">
-                        <span className="dbcard2__top">
-                          <span className="dbcard2__ic" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" /><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" /></svg>
-                          </span>
-                          <svg className="dbcard2__go" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" /></svg>
-                        </span>
-                        <h3>{d.name}</h3>
+                        <h3 title={d.name}>{d.name}</h3>
                         <span className="dbcard2__chips">
                           {d.db_type && <span className="chip2">{d.db_type}</span>}
                           {d.status && <span className={`chip2 chip2--${/complete|verified/i.test(d.status) && !/awaiting/i.test(d.status) ? 'good' : 'wait'}`}><i aria-hidden="true" />{d.status}</span>}

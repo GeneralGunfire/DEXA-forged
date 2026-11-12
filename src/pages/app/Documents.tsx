@@ -37,12 +37,12 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
 
   const rows = (data ?? []).filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()))
 
-  const [viewing, setViewing] = useState<DocRow | null>(null)
-  async function open(d: DocRow) {
+  const [viewing, setViewing] = useState<{ name: string; path: string; mime: string | null } | null>(null)
+  async function open(d: { name: string; path: string; mime: string | null }) {
     if (['PDF', 'Image'].includes(fileKind(d.mime, d.name))) return setViewing(d)
     try { window.open(await signedUrl(d.path), '_blank', 'noopener') } catch (e) { setMsg(describe(e)) }
   }
-  async function download(d: DocRow) {
+  async function download(d: { name: string; path: string }) {
     try { await downloadFile(d.path, d.name) } catch (e) { setMsg(describe(e)) }
   }
   async function remove(d: DocRow) {
@@ -78,6 +78,8 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
 
       {msg && <p className="notice notice--err" role="alert">{msg}</p>}
 
+      {!databaseId && <DatabaseDocsFolder q={q} onView={open} onDownload={download} />}
+
       <LoadState loading={loading && !data} error={error}>
         {rows.length === 0 ? (
           <EmptyState
@@ -107,10 +109,54 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
         )}
       </LoadState>
 
-      <DocViewer doc={viewing ? { name: viewing.name, path: viewing.path, mime: viewing.mime } : null} onClose={() => setViewing(null)} />
+      <DocViewer doc={viewing} onClose={() => setViewing(null)} />
       <UploadDialog open={uploading} onClose={() => setUploading(false)} databaseId={databaseId} onDone={reload} />
       <RenameDialog doc={renaming} onClose={() => setRenaming(null)} onDone={reload} />
     </>
+  )
+}
+
+type DbDocRow = { id: string; name: string; path: string; mime: string | null; size: number | null; document_date: string; databases: { name: string } | { name: string }[] | null }
+const dbName = (d: DbDocRow) => (Array.isArray(d.databases) ? d.databases[0]?.name : d.databases?.name) ?? ''
+
+/** A read-only folder of every database's current official document. The files stay under each database's own
+ *  Documents tab; this is the same file, listed here too, so nothing is copied or uploaded twice. */
+function DatabaseDocsFolder({ q, onView, onDownload }: {
+  q: string
+  onView: (d: { name: string; path: string; mime: string | null }) => void
+  onDownload: (d: { name: string; path: string }) => void
+}) {
+  const { data } = useLoad<DbDocRow[]>(async () =>
+    unwrap<DbDocRow[]>(await supabase.from('db_documents').select('id, name, path, mime, size, document_date, databases(name)').eq('is_current', true).order('document_date', { ascending: false }).order('name')) ?? [])
+  const all = data ?? []
+  const needle = q.trim().toLowerCase()
+  const rows = all.filter((d) => !needle || `${d.name} ${dbName(d)}`.toLowerCase().includes(needle))
+  if (all.length === 0 || rows.length === 0) return null
+  return (
+    <details className="fold" open>
+      <summary>
+        <svg className="fold__chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+        <strong>Official database documents</strong>
+        <span className="fold__n">{rows.length}</span>
+      </summary>
+      <p className="muted fold__note">The current final document for each database. They are managed on each database's Documents tab.</p>
+      <div className="rows">
+        {rows.map((d) => (
+          <div className="item" key={d.id}>
+            <span className="item__ico">{fileKind(d.mime, d.name).toUpperCase().slice(0, 4)}</span>
+            <div className="item__main">
+              <p className="item__title" title={d.name}>{d.name}</p>
+              <p className="item__meta">{[dbName(d), fmtBytes(d.size), fmtDate(d.document_date)].filter(Boolean).join(' · ')}</p>
+            </div>
+            <div className="item__acts">
+              <button type="button" className="btn btn--sm" onClick={() => onView(d)}>View</button>
+              <button type="button" className="btn btn--sm" onClick={() => onDownload(d)}>Download</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
   )
 }
 
