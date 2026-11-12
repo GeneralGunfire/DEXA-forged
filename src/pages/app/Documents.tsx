@@ -14,7 +14,7 @@ import { useOpenFromQuery } from '../../components/nav'
 
 export type DocRow = {
   id: string; name: string; path: string; mime: string | null; size: number | null
-  database_id: string | null; created_by: string; created_at: string
+  database_id: string | null; created_by: string; created_at: string; folder?: string
 }
 
 const stripExt = (n: string) => n.replace(/\.[^.]+$/, '')
@@ -35,7 +35,8 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
   const [renaming, setRenaming] = useState<DocRow | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const rows = (data ?? []).filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()))
+  const folders = [...new Set((data ?? []).map((d) => d.folder ?? '').filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  const rows = (data ?? []).filter((d) => `${d.name} ${d.folder ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
 
   const [viewing, setViewing] = useState<{ name: string; path: string; mime: string | null } | null>(null)
   async function open(d: { name: string; path: string; mime: string | null }) {
@@ -87,8 +88,9 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
             text={data && data.length ? undefined : 'PDF, Word, MP4, JPEG and PNG files, up to 50 MB each.'}
           />
         ) : (
-          <div className="rows">
-            {rows.map((d) => (
+          <>
+            {(() => {
+              const row = (d: DocRow) => (
               <div className="item" key={d.id}>
                 <span className="item__ico">{fileKind(d.mime, d.name).toUpperCase().slice(0, 4)}</span>
                 <div className="item__main">
@@ -104,14 +106,36 @@ export function DocumentsPanel({ databaseId = null }: { databaseId?: string | nu
                   <button type="button" className="btn btn--sm btn--danger" onClick={() => remove(d)}>Delete</button>
                 </div>
               </div>
-            ))}
-          </div>
+              )
+              const loose = rows.filter((d) => !d.folder)
+              const groups = [...new Set(rows.filter((d) => d.folder).map((d) => d.folder as string))].sort((a, b) => a.localeCompare(b))
+              return (
+                <>
+                  {groups.map((g) => {
+                    const inG = rows.filter((d) => d.folder === g)
+                    return (
+                      <details className="fold" key={g} open>
+                        <summary>
+                          <svg className="fold__chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+                          <strong>{g}</strong>
+                          <span className="fold__n">{inG.length}</span>
+                        </summary>
+                        <div className="rows">{inG.map(row)}</div>
+                      </details>
+                    )
+                  })}
+                  {loose.length > 0 && <div className="rows">{loose.map(row)}</div>}
+                </>
+              )
+            })()}
+          </>
         )}
       </LoadState>
 
       <DocViewer doc={viewing} onClose={() => setViewing(null)} />
-      <UploadDialog open={uploading} onClose={() => setUploading(false)} databaseId={databaseId} onDone={reload} />
-      <RenameDialog doc={renaming} onClose={() => setRenaming(null)} onDone={reload} />
+      <UploadDialog open={uploading} onClose={() => setUploading(false)} databaseId={databaseId} folders={folders} onDone={reload} />
+      <RenameDialog doc={renaming} folders={folders} onClose={() => setRenaming(null)} onDone={reload} />
     </>
   )
 }
@@ -137,10 +161,10 @@ function DatabaseDocsFolder({ q, onView, onDownload }: {
       <summary>
         <svg className="fold__chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
-        <strong>Official database documents</strong>
+        <strong>Current database documents</strong>
         <span className="fold__n">{rows.length}</span>
       </summary>
-      <p className="muted fold__note">The current final document for each database. They are managed on each database's Documents tab.</p>
+      <p className="muted fold__note">Always the latest version for each database, listed here automatically. Manage them on each database's Documents tab.</p>
       <div className="rows">
         {rows.map((d) => (
           <div className="item" key={d.id}>
@@ -161,14 +185,15 @@ function DatabaseDocsFolder({ q, onView, onDownload }: {
 }
 
 function UploadDialog({
-  open, onClose, databaseId, onDone,
-}: { open: boolean; onClose: () => void; databaseId: string | null; onDone: () => void }) {
+  open, onClose, databaseId, folders, onDone,
+}: { open: boolean; onClose: () => void; databaseId: string | null; folders: string[]; onDone: () => void }) {
   const [files, setFiles] = useState<File[]>([])
   const [name, setName] = useState('')
+  const [folder, setFolder] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [progress, setProgress] = useState<string | null>(null)
 
-  function close() { setFiles([]); setName(''); setErr(null); setProgress(null); onClose() }
+  function close() { setFiles([]); setName(''); setFolder(''); setErr(null); setProgress(null); onClose() }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -184,7 +209,7 @@ function UploadDialog({
         const f = files[i]
         const up = await uploadFile(f, databaseId ? `databases/${databaseId}` : 'documents')
         const display = files.length === 1 && name.trim() ? name.trim() : stripExt(f.name)
-        unwrap(await supabase.from('documents').insert({ name: display, path: up.path, mime: up.mime, size: up.size, database_id: databaseId }))
+        unwrap(await supabase.from('documents').insert({ name: display, path: up.path, mime: up.mime, size: up.size, database_id: databaseId, ...(!databaseId && folder.trim() ? { folder: folder.trim() } : {}) }))
       }
       onDone()
       close()
@@ -206,6 +231,12 @@ function UploadDialog({
         {files.length === 1 && (
           <Field label="Name"><input type="text" value={name} maxLength={200} onChange={(e) => setName(e.target.value)} /></Field>
         )}
+        {!databaseId && (
+          <Field label="Folder" hint="Optional. Pick one or type a new name.">
+            <input type="text" list="doc-folders" value={folder} maxLength={80} placeholder="No folder" onChange={(e) => setFolder(e.target.value)} />
+            <datalist id="doc-folders">{folders.map((f) => <option key={f} value={f} />)}</datalist>
+          </Field>
+        )}
         {files.length > 1 && <p className="muted" style={{ marginBottom: 12 }}>{files.length} files selected. Each keeps its file name; you can rename them afterwards.</p>}
         {err && <p className="formerr" role="alert">{err}</p>}
         <div className="dlg__foot">
@@ -217,26 +248,34 @@ function UploadDialog({
   )
 }
 
-function RenameDialog({ doc, onClose, onDone }: { doc: DocRow | null; onClose: () => void; onDone: () => void }) {
+function RenameDialog({ doc, folders, onClose, onDone }: { doc: DocRow | null; folders: string[]; onClose: () => void; onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const name = String(new FormData(e.currentTarget).get('name') ?? '').trim()
+    const fd = new FormData(e.currentTarget)
+    const name = String(fd.get('name') ?? '').trim()
+    const folder = String(fd.get('folder') ?? '').trim()
     if (!doc || !name) return setErr('Enter a name.')
     setBusy(true)
     try {
-      unwrap(await supabase.from('documents').update({ name }).eq('id', doc.id))
+      unwrap(await supabase.from('documents').update({ name, ...(!doc.database_id && folder !== (doc.folder ?? '') ? { folder } : {}) }).eq('id', doc.id))
       onDone(); onClose()
     } catch (ex) { setErr(describe(ex)) } finally { setBusy(false) }
   }
 
   return (
-    <Dialog open={!!doc} onClose={onClose} title="Rename document">
+    <Dialog open={!!doc} onClose={onClose} title={doc?.database_id ? 'Rename document' : 'Rename or move document'}>
       {doc && (
         <form key={doc.id} onSubmit={submit}>
           <Field label="Name"><input type="text" name="name" autoFocus defaultValue={doc.name} maxLength={200} /></Field>
+          {!doc.database_id && (
+            <Field label="Folder" hint="Leave empty for no folder.">
+              <input type="text" name="folder" list="doc-folders2" defaultValue={doc.folder ?? ''} maxLength={80} />
+              <datalist id="doc-folders2">{folders.map((f) => <option key={f} value={f} />)}</datalist>
+            </Field>
+          )}
           {err && <p className="formerr" role="alert">{err}</p>}
           <div className="dlg__foot">
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
