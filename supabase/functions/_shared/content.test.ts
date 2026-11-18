@@ -22,7 +22,7 @@ beforeEach(async () => {
     findDatabaseId: async (s) => (s === 'public_hospital' ? 'db-uuid' : null),
     upsertSection: async (s) => { const created = !saved.some((x) => x.title === s.title); saved.push(s); return { id: 'sec-id', created } },
     getField: async (_db, f) => (f in fields ? fields[f] : null),
-    setField: async (_db, f, t) => { writes.push([f, t]); fields[f] = t },
+    setField: async (_db, f, t, exp) => { if (fields[f] !== exp) return false; writes.push([f, t]); fields[f] = t; return true },
   }
 })
 const post = (body: unknown, auth: string | null = `Bearer ${TOKEN}`, now = NOW) =>
@@ -109,7 +109,7 @@ describe('content-write: record fields', () => {
   })
   it('writes only the replaced sentence and reports the lengths; the old text is returned by the dry run first', async () => {
     const before = (await (await post({ ...edit, dry_run: true })).json()).old
-    const r = await post(edit)
+    const r = await post({ ...edit, expected_old: before })
     expect(r.status).toBe(200)
     expect((await r.json())).toMatchObject({ dry_run: false, changed: true, old_length: before.length })
     expect(writes).toEqual([['shortfalls', before.replace('45% unbilled by design', '45.0% have no bill account')]])
@@ -124,6 +124,24 @@ describe('content-write: record fields', () => {
   it('allows each of the three free-text fields', async () => {
     expect((await post({ db: 'public_hospital', field: 'background', replace: '8.9 million beneficiaries (annual report)', with: '9.17 million beneficiaries (annual report)', dry_run: true })).status).toBe(200)
     expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', dry_run: true })).status).toBe(200)
+  })
+  it('refuses a real write without expected_old, or when the field changed since it was read, and writes nothing', async () => {
+    const before = (await (await post({ ...edit, dry_run: true })).json()).old
+    expect((await post(edit)).status).toBe(422)
+    fields.shortfalls = before + ' Someone added this.'
+    const r = await post({ ...edit, expected_old: before })
+    expect(r.status).toBe(409)
+    expect((await r.json()).error).toContain('changed since it was read')
+    expect(writes).toHaveLength(0)
+    expect(fields.shortfalls).toBe(before + ' Someone added this.')
+  })
+  it('refuses when the field changes between the check and the write (the conditional update fails)', async () => {
+    const before = (await (await post({ ...edit, dry_run: true })).json()).old
+    const real = store.setField
+    store = { ...store, setField: async () => false }
+    expect((await post({ ...edit, expected_old: before })).status).toBe(409)
+    store = { ...store, setField: real }
+    expect(writes).toHaveLength(0)
   })
   it('requires the old text to appear exactly once', async () => {
     expect((await post({ ...edit, replace: 'not in the field' })).status).toBe(422)

@@ -118,7 +118,8 @@ async function editField(args, url, token) {
     '--detail-file', tmp], { encoding: 'utf8' })
   try { fs.unlinkSync(tmp) } catch { /* ignore */ }
   if (log.status !== 0) fail('Not changed: the old text could not be saved to the timeline first.', 2)
-  const w = await post(url, token, { ...base, dry_run: false })
+  const w = await post(url, token, { ...base, dry_run: false, expected_old: d.body.old })
+  if (w.status === 409) fail('Not changed: the field changed after it was read. Run the dry run again. The old-text Note was already saved.', 2)
   if (w.status !== 200 || w.body.dry_run !== false) fail(`Not changed: ${w.body.error || `HTTP ${w.status}`}`, w.status === 422 ? 1 : 2)
   process.stdout.write(`Changed: ${args.field} (${w.body.old_length} -> ${w.body.new_length} characters). Old text saved to the timeline as ${log.stdout.trim()}.\n`)
 }

@@ -25,7 +25,8 @@ export interface ContentStore {
   findDatabaseId(slug: string): Promise<string | null>
   upsertSection(s: Section): Promise<{ id: string; created: boolean }>
   getField(databaseId: string, field: string): Promise<string | null>
-  setField(databaseId: string, field: string, text: string): Promise<void>
+  /** Writes only if the field still equals expectedOld; returns false if it changed meanwhile. */
+  setField(databaseId: string, field: string, text: string, expectedOld: string): Promise<boolean>
 }
 
 /** The only record fields a content token may edit, with the length limit the database enforces on each. */
@@ -74,7 +75,9 @@ function checkChart(body: string): { ok: true; flat: string } | { ok: false; err
 }
 
 /**
- * Edit one sentence of a record's own free-text field: {db, field, replace, with, dry_run}.
+ * Edit one sentence of a record's own free-text field: {db, field, replace, with, dry_run, expected_old}.
+ * A real write must carry expected_old (the field text the caller read in its dry run); it is refused with 409 if the
+ * field no longer equals that text, so a change made in between is never overwritten.
  * The old text must appear exactly once. A dry run returns the old and new field text and writes nothing.
  * Only the fields in FIELD_LIMITS can be edited; anything else is refused.
  */
@@ -100,7 +103,10 @@ async function handleField(b: Record<string, unknown>, store: ContentStore): Pro
   const next = old.slice(0, first) + b.with + old.slice(first + rep.length)
   if (next.length > FIELD_LIMITS[field]) return json(422, { error: `The field would be longer than ${FIELD_LIMITS[field]} characters.` })
   if (dry) return json(200, { dry_run: true, field, old, new: next })
-  await store.setField(databaseId, field, next)
+  if (typeof b.expected_old !== 'string') return json(422, { error: 'A real write needs "expected_old": the field text read in the dry run.' })
+  const stale = { error: 'The field has changed since it was read. Nothing was written. Run the dry run again.' }
+  if (b.expected_old !== old) return json(409, stale)
+  if (!(await store.setField(databaseId, field, next, b.expected_old))) return json(409, stale)
   return json(200, { dry_run: false, field, changed: next !== old, old_length: old.length, new_length: next.length })
 }
 

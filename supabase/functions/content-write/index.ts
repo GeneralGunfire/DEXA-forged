@@ -45,9 +45,11 @@ const store: ContentStore = {
     const v = (data as Record<string, unknown> | null)?.[field]
     return typeof v === 'string' ? v : null
   },
-  async setField(databaseId, field, text) {
-    const { error } = await admin.from('databases').update({ [field]: text }).eq('id', databaseId)
+  // conditional: the update only matches while the field still equals the text the caller read
+  async setField(databaseId, field, text, expectedOld) {
+    const { data, error } = await admin.from('databases').update({ [field]: text }).eq('id', databaseId).eq(field, expectedOld).select('id')
     if (error) throw error
+    return (data?.length ?? 0) === 1
   },
 }
 
