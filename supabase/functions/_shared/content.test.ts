@@ -116,14 +116,18 @@ describe('content-write: record fields', () => {
     expect(fields.shortfalls).toBe('- Billing is 45.0% have no bill account.\n- Other point.')
   })
   it('refuses any field that is not on the allowlist, and reads nothing', async () => {
-    for (const f of ['name', 'port', 'status', 'created_by', 'id', '__proto__', 'toString', '']) {
+    for (const f of ['build_record', 'name', 'port', 'status', 'created_by', 'id', '__proto__', 'toString', '']) {
       expect((await post({ ...edit, field: f })).status).toBe(422)
     }
     expect(writes).toHaveLength(0)
   })
-  it('allows each of the three free-text fields', async () => {
+  it('allows the two free-text fields background and shortfalls', async () => {
     expect((await post({ db: 'public_hospital', field: 'background', replace: '8.9 million beneficiaries (annual report)', with: '9.17 million beneficiaries (annual report)', dry_run: true })).status).toBe(200)
-    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', dry_run: true })).status).toBe(200)
+    expect((await post({ db: 'public_hospital', field: 'shortfalls', replace: 'Other point.', with: 'Another point.', dry_run: true })).status).toBe(200)
+    // build_record is no longer editable by the content tool
+    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', dry_run: true })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', expected_old: 'Port 5433.' })).status).toBe(422)
+    expect(writes).toHaveLength(0)
   })
   it('refuses a real write without expected_old, or when the field changed since it was read, and writes nothing', async () => {
     const before = (await (await post({ ...edit, dry_run: true })).json()).old

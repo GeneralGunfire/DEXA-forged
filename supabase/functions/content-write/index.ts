@@ -39,7 +39,7 @@ const store: ContentStore = {
     if (error) throw error
     return { id: data.id, created: true }
   },
-  // only background, shortfalls and build_record ever reach these two (the handler checks the allowlist)
+  // only background and shortfalls ever reach these two (the handler checks the allowlist)
   async getField(databaseId, field) {
     const { data } = await admin.from('databases').select(field).eq('id', databaseId).maybeSingle()
     const v = (data as Record<string, unknown> | null)?.[field]
