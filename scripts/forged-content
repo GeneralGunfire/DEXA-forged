@@ -6,6 +6,10 @@
  * Writing the same db + area + title again replaces that section.
  */
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 const USAGE = `Usage:
   forged-content --db public_hospital --area build --title "Tables" --summary "Plain words" --body-file tables.md
@@ -22,6 +26,14 @@ Options: --db <slug>        database slug (omit, or "estate", for the whole-esta
          --csv-file <file>  a CSV with a header row; sent as a table (kind table)
          --position <n>     order on the page, lowest first (default 100)
          --open             show the section expanded (default collapsed)
+Edit one sentence of a record's own text field (background, shortfalls or build_record):
+  forged-content --db cms --field shortfalls --replace "old sentence" --with "new sentence" --dry-run
+         --field background|shortfalls|build_record   the record field (nothing else is allowed)
+         --replace <text> | --replace-file <file>      the old text; it must appear exactly once
+         --with <text>    | --with-file <file>         the new text
+         --dry-run        show the old and new field text and write nothing
+  Without --dry-run the old field text is first saved as a timeline Note (needs FORGED_LOG_URL and
+  FORGED_LOG_TOKEN); if that fails nothing is changed.
 Environment: FORGED_CONTENT_URL, FORGED_CONTENT_TOKEN`
 
 const fail = (m, code = 1) => { process.stderr.write(m + '\n'); process.exit(code) }
@@ -49,6 +61,11 @@ function parse(argv) {
     const a = argv[i]
     if (a === '--help' || a === '-h') { process.stdout.write(USAGE + '\n'); process.exit(0) }
     else if (a === '--open') o.collapsed = false
+    else if (a === '--dry-run') o.dry_run = true
+    else if (a === '--field') o.field = val(a, i++)
+    else if (a === '--replace') o.replace = val(a, i++)
+    else if (a === '--with') o.with = val(a, i++)
+    else if (a === '--replace-file' || a === '--with-file') { const f = val(a, i++); try { o[a === '--replace-file' ? 'replace' : 'with'] = fs.readFileSync(f, 'utf8').replace(/\r?\n$/, '') } catch { fail(`Cannot read ${f}.`) } }
     else if (a === '--db') o.db = val(a, i++)
     else if (a === '--area') o.area = val(a, i++)
     else if (a === '--title') o.title = val(a, i++)
@@ -70,8 +87,50 @@ function parse(argv) {
   return o
 }
 
+async function post(url, token, payload) {
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload), signal: AbortSignal.timeout(60000),
+    })
+  } catch { fail('Could not reach the site. Nothing was saved.', 2) }
+  let body = {}
+  try { body = await res.json() } catch { /* not json */ }
+  return { status: res.status, body }
+}
+
+async function editField(args, url, token) {
+  if (!args.db || !args.replace || args.with === undefined) fail('--db, --field, --replace and --with are required to edit a field.')
+  const base = { db: args.db, field: args.field, replace: args.replace, with: args.with }
+  const d = await post(url, token, { ...base, dry_run: true })
+  if (d.status !== 200 || !d.body.dry_run) fail(`Not changed: ${d.body.error || `HTTP ${d.status}`}`, d.status === 422 ? 1 : 2)
+  process.stdout.write(`Field: ${args.db} / ${args.field}\n----- OLD -----\n${d.body.old}\n----- NEW -----\n${d.body.new}\n----- end -----\n`)
+  if (args.dry_run) return process.stdout.write('Dry run: nothing was written.\n')
+  // keep the full old text on the timeline first, so the change can be undone; no log, no write
+  const tmp = path.join(os.tmpdir(), `forged-field-${process.pid}.txt`)
+  fs.writeFileSync(tmp, d.body.old)
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  const log = spawnSync(process.execPath, [path.join(here, 'forged-log'),
+    '--db', args.db, '--type', 'Note', '--phase', '1-2', '--session', 'Record field edit',
+    '--title', `Old text of the ${args.field} field kept before a tool edit`,
+    '--summary', `The record field ${args.field} is about to be edited by tool. The full old text is kept in the detail so the change can be undone.`,
+    '--detail-file', tmp], { encoding: 'utf8' })
+  try { fs.unlinkSync(tmp) } catch { /* ignore */ }
+  if (log.status !== 0) fail('Not changed: the old text could not be saved to the timeline first.', 2)
+  const w = await post(url, token, { ...base, dry_run: false, expected_old: d.body.old })
+  if (w.status === 409) fail('Not changed: the field changed after it was read. Run the dry run again. The old-text Note was already saved.', 2)
+  if (w.status !== 200 || w.body.dry_run !== false) fail(`Not changed: ${w.body.error || `HTTP ${w.status}`}`, w.status === 422 ? 1 : 2)
+  process.stdout.write(`Changed: ${args.field} (${w.body.old_length} -> ${w.body.new_length} characters). Old text saved to the timeline as ${log.stdout.trim()}.\n`)
+}
+
 async function main() {
   const args = parse(process.argv.slice(2))
+  if (args.field) {
+    const u = process.env.FORGED_CONTENT_URL, t = process.env.FORGED_CONTENT_TOKEN
+    if (!u || !t) fail('Set FORGED_CONTENT_URL and FORGED_CONTENT_TOKEN in the environment first.')
+    return editField(args, u, t)
+  }
   if (!args.area || !args.title || !args.body) fail(`--area, --title and a body (--body, --body-file or --csv-file) are required.\n${USAGE}`)
   const url = process.env.FORGED_CONTENT_URL, token = process.env.FORGED_CONTENT_TOKEN
   if (!url || !token) fail('Set FORGED_CONTENT_URL and FORGED_CONTENT_TOKEN in the environment first.')

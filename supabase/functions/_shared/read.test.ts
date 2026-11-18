@@ -197,3 +197,120 @@ describe('forge-read: redaction safety net', () => {
     expect(g.text).not.toContain('hunter2')
   })
 })
+
+describe('forge-read: list_sections, section and offset', () => {
+  const three = () => [
+    section({ title: 'Alpha', position: 10, body: 'a'.repeat(120) }),
+    section({ title: 'Beta', position: 20, body: 'b'.repeat(30_000) }),
+    section({ title: 'Gamma', position: 30, body: 'gamma text', area: 'background' }),
+  ]
+
+  it('list_sections gives order, position and character count and no text', async () => {
+    sections = three()
+    const r = await post({ db: 'public_hospital', what: 'build', list_sections: true })
+    expect(r.status).toBe(200)
+    const t = await text(r)
+    expect(t).toContain('1. position 10, 120 characters: Alpha')
+    expect(t).toContain('2. position 20, 30000 characters: Beta')
+    expect(t).not.toContain('aaaa')
+    expect(t).not.toContain('Gamma')   // a background section is not in the build list
+  })
+
+  it('list_sections without what lists background and build', async () => {
+    sections = three()
+    const t = await text(await post({ db: 'public_hospital', list_sections: true }))
+    expect(t).toContain('Background (1 section')
+    expect(t).toContain('Build record (2 sections')
+    expect(t).toContain('1. position 30, 10 characters: Gamma')
+  })
+
+  it('section returns only that exact title, in full, without the record fields', async () => {
+    sections = three()
+    const t = await text(await post({ db: 'public_hospital', what: 'build', section: 'Beta' }))
+    expect(t).toContain('--- Beta [build')
+    expect(t).not.toContain('Alpha')
+    expect(t).not.toContain('Built from scripts.')          // record text field left out
+    expect(t).not.toContain('This item was cut')            // not clipped at 20,000 characters
+    expect(t).toContain('b'.repeat(30_000))
+    expect(t).toContain('[Part: characters 0 to')
+    expect(t).toContain('This is the end.')
+  })
+
+  it('section is an exact, case-sensitive match and says when nothing matches', async () => {
+    sections = three()
+    const r = await post({ db: 'public_hospital', what: 'build', section: 'alpha' })
+    expect(r.status).toBe(422)
+    expect((await r.json()).error).toContain('No section has that exact title')
+    expect((await post({ db: 'public_hospital', what: 'background', section: 'Alpha' })).status).toBe(422)   // wrong area
+  })
+
+  it('section works for estate pages, and with the estate db name', async () => {
+    sections = [section({ area: 'estate', title: 'Folder layout', body: 'folders here' })]
+    expect(await text(await post({ what: 'estate', section: 'Folder layout' }))).toContain('folders here')
+    expect((await post({ what: 'estate', section: 'Nope' })).status).toBe(422)
+    expect(await text(await post({ db: 'estate', what: 'estate', list_sections: true }))).toContain('Folder layout')
+  })
+
+  it('offset reads a long answer in parts of up to 60,000 characters that join back into the whole', async () => {
+    sections = [section({ title: 'Long', body: 'q'.repeat(150_000) })]
+    const parts: string[] = []
+    let next: number | null = 0
+    let guard = 0
+    while (next !== null && guard++ < 10) {
+      const j = await (await post({ db: 'public_hospital', what: 'build', section: 'Long', offset: next })).json()
+      const body = (j.text as string).replace(/\n\[Part: characters .*\]$/, '')
+      expect(body.length).toBeLessThanOrEqual(MAX_RESPONSE_CHARS)
+      parts.push(body)
+      next = j.next_offset
+    }
+    expect(parts.length).toBe(3)
+    const whole = parts.join('')
+    expect(whole.match(/q/g)!.length).toBe(150_000)
+    expect(whole).toContain('--- Long [build')
+  }, 120_000)
+
+  it('offset on its own pages the whole record answer, and a past-the-end offset is explained', async () => {
+    sections = three()
+    const first = await (await post({ db: 'public_hospital', what: 'build', offset: 0 })).json()
+    expect(first.text).toContain('--- Alpha')
+    expect(first.text).toContain('This item was cut at 20000 characters.')   // offset alone keeps the 20,000 character clip; only section reads in full
+    const past = await text(await post({ db: 'public_hospital', what: 'build', offset: 9_000_000 }))
+    expect(past).toContain('is past the end')
+  })
+
+  it('keeps the old behaviour when none of the new options is used', async () => {
+    sections = three()
+    const j = await (await post({ db: 'public_hospital', what: 'build' })).json()
+    expect(j.text).toContain('This item was cut at 20000 characters.')   // Beta is still clipped
+    expect(j.text).not.toContain('[Part:')
+    expect(j).not.toHaveProperty('next_offset')
+  })
+
+  it('validates the new options', async () => {
+    sections = three()
+    expect((await post({ db: 'public_hospital', what: 'build', offset: -1 })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', what: 'build', offset: 1.5 })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', what: 'build', offset: 'abc' })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', what: 'build', section: 'Alpha', list_sections: true })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', what: 'timeline', section: 'Alpha' })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', what: 'timeline', list_sections: true })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', what: 'build', section: 'x'.repeat(201) })).status).toBe(422)
+  })
+
+  it('still runs the safety check on a section and on a section list', async () => {
+    sections = [section({ title: 'Leaky', body: 'contact me at someone@example.com' }), section({ title: 'Fine', body: 'ok' })]
+    const one = await text(await post({ db: 'public_hospital', what: 'build', section: 'Leaky' }))
+    expect(one).toContain('withheld by the safety check')
+    expect(one).not.toContain('someone@example.com')
+    const list = await text(await post({ db: 'public_hospital', what: 'build', list_sections: true }))
+    expect(list).toContain('Leaky')   // the title itself is clean, so it is listed; the body is never shown
+    expect(list).not.toContain('someone@example.com')
+  })
+
+  it('the new options only call read methods and still need a valid token', async () => {
+    sections = three()
+    await post({ db: 'public_hospital', what: 'build', section: 'Alpha' })
+    expect(calls.every((c) => ['findDatabase', 'listSections', 'listDatabases', 'listEntries', 'listDocuments'].includes(c))).toBe(true)
+    expect((await post({ db: 'public_hospital', what: 'build', list_sections: true }, 'Bearer nope')).status).toBe(401)
+  })
+})

@@ -7,9 +7,13 @@ const NOW = new Date('2026-11-12T10:00:00Z')
 let saved: Section[]
 let token: { id: string; revoked_at: string | null; window_start: string | null; window_count: number; scope: string }
 let store: ContentStore
+let fields: Record<string, string>
+let writes: [string, string][]
 
 beforeEach(async () => {
   saved = []
+  writes = []
+  fields = { background: 'In real life. About 8.9 million beneficiaries (annual report). In the simulation. 10 schemes.', shortfalls: '- Billing is 45% unbilled by design.\n- Other point.', build_record: 'Port 5433.' }
   token = { id: 'tok1', revoked_at: null, window_start: null, window_count: 0, scope: 'content' }
   const hash = await sha256Hex(TOKEN)
   store = {
@@ -17,6 +21,8 @@ beforeEach(async () => {
     saveRate: async (_i, start, count) => { token = { ...token, window_start: start, window_count: count } },
     findDatabaseId: async (s) => (s === 'public_hospital' ? 'db-uuid' : null),
     upsertSection: async (s) => { const created = !saved.some((x) => x.title === s.title); saved.push(s); return { id: 'sec-id', created } },
+    getField: async (_db, f) => (f in fields ? fields[f] : null),
+    setField: async (_db, f, t, exp) => { if (fields[f] !== exp) return false; writes.push([f, t]); fields[f] = t; return true },
   }
 })
 const post = (body: unknown, auth: string | null = `Bearer ${TOKEN}`, now = NOW) =>
@@ -85,5 +91,84 @@ describe('content-write', () => {
   it('rate limits to 60 a minute', async () => {
     for (let i = 0; i < 60; i++) expect((await post(ok)).status).toBeLessThan(300)
     expect((await post(ok)).status).toBe(429)
+  })
+})
+
+describe('content-write: record fields', () => {
+  const edit = { db: 'public_hospital', field: 'shortfalls', replace: '45% unbilled by design', with: '45.0% have no bill account' }
+  it('dry run shows old and new text and writes nothing', async () => {
+    const r = await post({ ...edit, dry_run: true })
+    expect(r.status).toBe(200)
+    const j = await r.json()
+    expect(j.dry_run).toBe(true)
+    expect(j.old).toContain('45% unbilled by design')
+    expect(j.new).toContain('45.0% have no bill account')
+    expect(j.new).toContain('- Other point.')
+    expect(writes).toHaveLength(0)
+    expect(fields.shortfalls).toContain('45% unbilled by design')
+  })
+  it('writes only the replaced sentence and reports the lengths; the old text is returned by the dry run first', async () => {
+    const before = (await (await post({ ...edit, dry_run: true })).json()).old
+    const r = await post({ ...edit, expected_old: before })
+    expect(r.status).toBe(200)
+    expect((await r.json())).toMatchObject({ dry_run: false, changed: true, old_length: before.length })
+    expect(writes).toEqual([['shortfalls', before.replace('45% unbilled by design', '45.0% have no bill account')]])
+    expect(fields.shortfalls).toBe('- Billing is 45.0% have no bill account.\n- Other point.')
+  })
+  it('refuses any field that is not on the allowlist, and reads nothing', async () => {
+    for (const f of ['name', 'port', 'status', 'created_by', 'id', '__proto__', 'toString', '']) {
+      expect((await post({ ...edit, field: f })).status).toBe(422)
+    }
+    expect(writes).toHaveLength(0)
+  })
+  it('allows each of the three free-text fields', async () => {
+    expect((await post({ db: 'public_hospital', field: 'background', replace: '8.9 million beneficiaries (annual report)', with: '9.17 million beneficiaries (annual report)', dry_run: true })).status).toBe(200)
+    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', dry_run: true })).status).toBe(200)
+  })
+  it('refuses a real write without expected_old, or when the field changed since it was read, and writes nothing', async () => {
+    const before = (await (await post({ ...edit, dry_run: true })).json()).old
+    expect((await post(edit)).status).toBe(422)
+    fields.shortfalls = before + ' Someone added this.'
+    const r = await post({ ...edit, expected_old: before })
+    expect(r.status).toBe(409)
+    expect((await r.json()).error).toContain('changed since it was read')
+    expect(writes).toHaveLength(0)
+    expect(fields.shortfalls).toBe(before + ' Someone added this.')
+  })
+  it('refuses when the field changes between the check and the write (the conditional update fails)', async () => {
+    const before = (await (await post({ ...edit, dry_run: true })).json()).old
+    const real = store.setField
+    store = { ...store, setField: async () => false }
+    expect((await post({ ...edit, expected_old: before })).status).toBe(409)
+    store = { ...store, setField: real }
+    expect(writes).toHaveLength(0)
+  })
+  it('requires the old text to appear exactly once', async () => {
+    expect((await post({ ...edit, replace: 'not in the field' })).status).toBe(422)
+    fields.shortfalls = 'same same'
+    expect((await post({ ...edit, replace: 'same' })).status).toBe(422)
+    expect(writes).toHaveLength(0)
+  })
+  it('validates the request and needs a content token', async () => {
+    expect((await post({ ...edit, db: 'nope' })).status).toBe(422)
+    expect((await post({ ...edit, db: undefined })).status).toBe(422)
+    expect((await post({ ...edit, replace: '  ' })).status).toBe(422)
+    expect((await post({ ...edit, with: 5 })).status).toBe(422)
+    expect((await post({ ...edit, dry_run: 'yes' })).status).toBe(422)
+    expect((await post(edit, null)).status).toBe(401)
+    token = { ...token, scope: 'log' }
+    expect((await post(edit)).status).toBe(401)
+    expect(writes).toHaveLength(0)
+  })
+  it('runs the redaction check on the new text and never echoes it', async () => {
+    const r = await post({ ...edit, with: 'Contact 0821234567 now' })
+    expect(r.status).toBe(422)
+    expect(JSON.stringify(await r.json())).not.toContain('0821234567')
+    expect(writes).toHaveLength(0)
+  })
+  it('refuses a field that would grow past its limit', async () => {
+    fields.shortfalls = 'x'.repeat(19_990) + ' tail'
+    expect((await post({ ...edit, replace: 'tail', with: 'y'.repeat(100) })).status).toBe(422)
+    expect(writes).toHaveLength(0)
   })
 })

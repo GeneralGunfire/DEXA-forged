@@ -24,7 +24,14 @@ export interface ContentStore {
   saveRate(tokenId: string, windowStart: string, count: number, usedAt: string): Promise<void>
   findDatabaseId(slug: string): Promise<string | null>
   upsertSection(s: Section): Promise<{ id: string; created: boolean }>
+  getField(databaseId: string, field: string): Promise<string | null>
+  /** Writes only if the field still equals expectedOld; returns false if it changed meanwhile. */
+  setField(databaseId: string, field: string, text: string, expectedOld: string): Promise<boolean>
 }
+
+/** The only record fields a content token may edit, with the length limit the database enforces on each. */
+export const FIELD_LIMITS: Record<string, number> = { background: 20_000, shortfalls: 20_000, build_record: 40_000 }
+const MAX_SENTENCE = 5_000
 
 const json = (status: number, body: Record<string, unknown>, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...extra } })
@@ -67,6 +74,42 @@ function checkChart(body: string): { ok: true; flat: string } | { ok: false; err
   return { ok: true, flat: labels.join(String.fromCharCode(10)) }
 }
 
+/**
+ * Edit one sentence of a record's own free-text field: {db, field, replace, with, dry_run, expected_old}.
+ * A real write must carry expected_old (the field text the caller read in its dry run); it is refused with 409 if the
+ * field no longer equals that text, so a change made in between is never overwritten.
+ * The old text must appear exactly once. A dry run returns the old and new field text and writes nothing.
+ * Only the fields in FIELD_LIMITS can be edited; anything else is refused.
+ */
+async function handleField(b: Record<string, unknown>, store: ContentStore): Promise<Response> {
+  const field = typeof b.field === 'string' ? b.field : ''
+  if (!Object.prototype.hasOwnProperty.call(FIELD_LIMITS, field)) return json(422, { error: `The field must be one of: ${Object.keys(FIELD_LIMITS).join(', ')}.` })
+  const db = typeof b.db === 'string' ? b.db.trim() : ''
+  if (!db) return json(422, { error: 'A db slug is required to edit a field.' })
+  const rep = typeof b.replace === 'string' ? b.replace : ''
+  if (!rep.trim() || rep.length > MAX_SENTENCE) return json(422, { error: `"replace" must be the old text, 1 to ${MAX_SENTENCE} characters.` })
+  if (typeof b.with !== 'string' || b.with.length > MAX_SENTENCE) return json(422, { error: `"with" must be the new text, up to ${MAX_SENTENCE} characters.` })
+  if (b.dry_run !== undefined && typeof b.dry_run !== 'boolean') return json(422, { error: 'dry_run must be true or false.' })
+  const dry = b.dry_run === true
+  const red = checkRedaction({ title: '', summary: '', body: b.with })
+  if (!red.ok) return json(422, { error: red.message, kind: red.kind, field: 'with' })
+  const databaseId = await store.findDatabaseId(db)
+  if (!databaseId) return json(422, { error: 'No database has that slug.' })
+  const old = await store.getField(databaseId, field)
+  if (old === null) return json(422, { error: 'That field could not be read.' })
+  const first = old.indexOf(rep)
+  if (first < 0) return json(422, { error: 'The old text was not found in that field.' })
+  if (old.indexOf(rep, first + 1) >= 0) return json(422, { error: 'The old text appears more than once. Use a longer, unique piece of text.' })
+  const next = old.slice(0, first) + b.with + old.slice(first + rep.length)
+  if (next.length > FIELD_LIMITS[field]) return json(422, { error: `The field would be longer than ${FIELD_LIMITS[field]} characters.` })
+  if (dry) return json(200, { dry_run: true, field, old, new: next })
+  if (typeof b.expected_old !== 'string') return json(422, { error: 'A real write needs "expected_old": the field text read in the dry run.' })
+  const stale = { error: 'The field has changed since it was read. Nothing was written. Run the dry run again.' }
+  if (b.expected_old !== old) return json(409, stale)
+  if (!(await store.setField(databaseId, field, next, b.expected_old))) return json(409, stale)
+  return json(200, { dry_run: false, field, changed: next !== old, old_length: old.length, new_length: next.length })
+}
+
 export async function handleContent(req: Request, store: ContentStore, now: Date = new Date()): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'Use POST.' }, { allow: 'POST' })
 
@@ -87,6 +130,8 @@ export async function handleContent(req: Request, store: ContentStore, now: Date
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error()
     b = raw as Record<string, unknown>
   } catch { return json(400, { error: 'The request body must be a JSON object.' }) }
+
+  if (b.field !== undefined) return handleField(b, store)
 
   const area = typeof b.area === 'string' ? b.area : ''
   if (!AREAS.includes(area)) return json(422, { error: `The area must be one of: ${AREAS.join(', ')}.` })
