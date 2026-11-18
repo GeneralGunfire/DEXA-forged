@@ -37,6 +37,9 @@ On Windows you can also use `scripts\forged-read.cmd`. It prints to standard out
 | `--what` | `overview` (default), `background`, `build`, `timeline`, `estate` or `documents-list`. |
 | `--limit` | Entries or sections, 1 to 200. Default 50. |
 | `--since` | Timeline only: entries from this date on. |
+| `--section` | `background`, `build` or estate pages: only the section with this exact title, in full (not cut at 20,000 characters). Case matters. |
+| `--list-sections` | Section titles in order, with each one's position number and character count, no text. With `--what background` or `build` it lists that area; otherwise both. |
+| `--offset` | Start at this character of the answer. Use it to read a long answer in parts of up to 60,000 characters; the end of each part says which offset to use next. With `--section` or `--offset` the whole answer is built first, so a build record longer than 60,000 characters can be read to the end. |
 
 The same request can be made with a JSON body (`POST`) or a query string (`GET`). The token always goes in the `Authorization` header, never in the address.
 

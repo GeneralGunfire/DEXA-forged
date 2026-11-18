@@ -13,12 +13,17 @@ Options: --db <slug|estate>
          --what overview|background|build|timeline|estate|documents-list   (default overview)
          --limit <1-200>   entries or sections (default 50)
          --since <date>    timeline only: entries from this date on
+         --section "<title>"  background, build or estate: only the section with that exact title, in full
+         --list-sections   section titles in order with position and character count, no text
+         --offset <N>      read a long answer in parts: start at character N (each part is up to 60,000 characters;
+                           the end of a part says which offset to use next)
 Environment: FORGED_READ_URL, FORGED_READ_TOKEN`
 
 class Done extends Error {}
 // Set the exit code and unwind instead of process.exit(), which makes Node on Windows print an assertion line after fetch.
 const fail = (m, code = 1) => { process.stderr.write(m + '\n'); process.exitCode = code; throw new Done() }
-const FLAGS = new Set(['db', 'what', 'limit', 'since'])
+const FLAGS = new Set(['db', 'what', 'limit', 'since', 'section', 'offset', 'list-sections'])
+const BOOLEAN_FLAGS = new Set(['list-sections'])
 
 function parse(argv) {
   const o = {}
@@ -27,9 +32,15 @@ function parse(argv) {
     if (a === '--help' || a === '-h') { process.stdout.write(USAGE + '\n'); process.exit(0) }
     const m = a.match(/^--([a-z-]+)(?:=(.*))?$/)
     if (!m || !FLAGS.has(m[1])) fail(`Unknown option ${a.split('=')[0]}.\n${USAGE}`)
+    if (BOOLEAN_FLAGS.has(m[1])) {
+      if (m[2] !== undefined && m[2] !== 'true') fail(`${a.split('=')[0]} takes no value.`)
+      o[m[1].replace('-', '_')] = true
+      continue
+    }
     const v = m[2] !== undefined ? m[2] : argv[++i]
     if (v === undefined) fail(`${a} needs a value.`)
-    o[m[1]] = m[1] === 'limit' ? Number(v) : v
+    o[m[1]] = (m[1] === 'limit' || m[1] === 'offset') ? Number(v) : v
+    if ((m[1] === 'limit' || m[1] === 'offset') && !Number.isFinite(o[m[1]])) fail(`${a.split('=')[0]} needs a number.`)
   }
   return o
 }
