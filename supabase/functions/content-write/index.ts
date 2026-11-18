@@ -39,6 +39,16 @@ const store: ContentStore = {
     if (error) throw error
     return { id: data.id, created: true }
   },
+  // only background, shortfalls and build_record ever reach these two (the handler checks the allowlist)
+  async getField(databaseId, field) {
+    const { data } = await admin.from('databases').select(field).eq('id', databaseId).maybeSingle()
+    const v = (data as Record<string, unknown> | null)?.[field]
+    return typeof v === 'string' ? v : null
+  },
+  async setField(databaseId, field, text) {
+    const { error } = await admin.from('databases').update({ [field]: text }).eq('id', databaseId)
+    if (error) throw error
+  },
 }
 
 Deno.serve(async (req) => {
