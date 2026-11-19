@@ -30,7 +30,7 @@ export interface ContentStore {
 }
 
 /** The only record fields a content token may edit, with the length limit the database enforces on each. */
-export const FIELD_LIMITS: Record<string, number> = { background: 20_000, shortfalls: 20_000 }
+export const FIELD_LIMITS: Record<string, number> = { background: 20_000, shortfalls: 20_000, build_record: 40_000 }
 const MAX_SENTENCE = 5_000
 
 const json = (status: number, body: Record<string, unknown>, extra: Record<string, string> = {}) =>

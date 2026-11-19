@@ -116,17 +116,29 @@ describe('content-write: record fields', () => {
     expect(fields.shortfalls).toBe('- Billing is 45.0% have no bill account.\n- Other point.')
   })
   it('refuses any field that is not on the allowlist, and reads nothing', async () => {
-    for (const f of ['build_record', 'name', 'port', 'status', 'created_by', 'id', '__proto__', 'toString', '']) {
+    for (const f of ['name', 'port', 'status', 'created_by', 'id', '__proto__', 'toString', '']) {
       expect((await post({ ...edit, field: f })).status).toBe(422)
     }
     expect(writes).toHaveLength(0)
   })
-  it('allows the two free-text fields background and shortfalls', async () => {
+  it('allows the three free-text fields background, shortfalls and build_record', async () => {
     expect((await post({ db: 'public_hospital', field: 'background', replace: '8.9 million beneficiaries (annual report)', with: '9.17 million beneficiaries (annual report)', dry_run: true })).status).toBe(200)
     expect((await post({ db: 'public_hospital', field: 'shortfalls', replace: 'Other point.', with: 'Another point.', dry_run: true })).status).toBe(200)
-    // build_record is no longer editable by the content tool
-    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', dry_run: true })).status).toBe(422)
-    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', expected_old: 'Port 5433.' })).status).toBe(422)
+    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', dry_run: true })).status).toBe(200)
+    expect(writes).toHaveLength(0)
+  })
+  it('writes build_record conditionally, like the other fields, and refuses it when stale', async () => {
+    const before = fields.build_record
+    const ok = await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433.', with: 'Port 5433 (PostgreSQL).', expected_old: before })
+    expect(ok.status).toBe(200)
+    expect(fields.build_record).toBe('Port 5433 (PostgreSQL).')
+    const stale = await post({ db: 'public_hospital', field: 'build_record', replace: 'Port 5433 (PostgreSQL).', with: 'Port 5433.', expected_old: before })
+    expect(stale.status).toBe(409)
+    expect(fields.build_record).toBe('Port 5433 (PostgreSQL).')
+  })
+  it('refuses build_record when it would grow past 40,000 characters', async () => {
+    fields.build_record = 'x'.repeat(39_990) + ' tail'
+    expect((await post({ db: 'public_hospital', field: 'build_record', replace: 'tail', with: 'y'.repeat(100), dry_run: true })).status).toBe(422)
     expect(writes).toHaveLength(0)
   })
   it('refuses a real write without expected_old, or when the field changed since it was read, and writes nothing', async () => {
