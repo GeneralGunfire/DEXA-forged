@@ -26,9 +26,9 @@ Options: --db <slug>        database slug (omit, or "estate", for the whole-esta
          --csv-file <file>  a CSV with a header row; sent as a table (kind table)
          --position <n>     order on the page, lowest first (default 100)
          --open             show the section expanded (default collapsed)
-Edit one sentence of a record's own text field (background or shortfalls):
+Edit one sentence of a record's own text field (background, shortfalls or build_record):
   forged-content --db cms --field shortfalls --replace "old sentence" --with "new sentence" --dry-run
-         --field background|shortfalls   the record field (nothing else is allowed)
+         --field background|shortfalls|build_record   the record field (nothing else is allowed)
          --replace <text> | --replace-file <file>      the old text; it must appear exactly once
          --with <text>    | --with-file <file>         the new text
          --dry-run        show the old and new field text and write nothing
