@@ -1,11 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Download, ExternalLink, FileText, Pencil, Plus, Upload, X } from 'lucide-react'
+import { Download, ExternalLink, FileText, Pencil, Plus, Upload } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import {
   checkFile, describe, downloadFile, fileKind, fmtBytes, fmtDate, signedUrl, unwrap, uploadFile, useLoad, useSignedUrl,
 } from '../../../lib/data'
 import { btn, btnGhost, btnPrimary, field, label } from '../calendar/cal'
 import { cn } from '@/lib/utils'
+import { Dialog } from '@/components/ui/dialog'
+import { FileField } from '@/components/ui/file-field'
+import { Combobox } from '@/components/ui/combobox'
 
 const ACCEPT = '.png,.jpg,.jpeg,.mp4,.pdf'
 const LABELS = ['Logo', 'Image', 'App screenshot', 'Video', 'Document', 'Other']
@@ -148,37 +151,40 @@ function AssetForm({ asset, onClose, onDone }: { asset?: Asset; onClose: () => v
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={asset ? 'Edit asset' : 'Upload brand asset'}>
-      <form onSubmit={submit} className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">{asset ? 'Edit asset' : 'Upload brand asset'}</h2>
-          <button type="button" onClick={onClose} className={btnGhost + ' !px-2'} aria-label="Close"><X className="size-4" aria-hidden="true" /></button>
-        </div>
-        <div className="space-y-5">
-          {!asset ? (
-            <div>
-              <label className={label} htmlFor="b-file">File</label>
-              <input id="b-file" type="file" accept={ACCEPT} className={field + ' file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-foreground'}
-                onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); if (f) { setName(stripExt(f.name)); setLbl(guessLabel(f)) } }} />
-              <p className="mt-1.5 text-xs text-muted-foreground">PNG, JPEG, MP4 or PDF. Up to 50 MB.</p>
-            </div>
-          ) : null}
-          <div>
-            <label className={label} htmlFor="b-name">Name</label>
-            <input id="b-name" className={field} value={name} maxLength={200} onChange={(e) => setName(e.target.value)} placeholder="e.g. DEXA logo, navy" autoFocus={!!asset} />
-          </div>
-          <div>
-            <label className={label} htmlFor="b-label">Label</label>
-            <input id="b-label" className={field} list="nf-brand-labels" value={lbl} maxLength={60} onChange={(e) => setLbl(e.target.value)} placeholder="What is this asset?" />
-            <datalist id="nf-brand-labels">{LABELS.map((l) => <option key={l} value={l} />)}</datalist>
-          </div>
-        </div>
-        {err ? <p className="mt-5 rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{err}</p> : null}
-        <div className="mt-6 flex justify-end gap-2">
+    <Dialog
+      open
+      onClose={onClose}
+      title={asset ? 'Edit asset' : 'Upload brand asset'}
+      size="sm"
+      notice={err}
+      footer={
+        <>
           <button type="button" className={btn} onClick={onClose}>Cancel</button>
-          <button type="submit" className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : asset ? 'Save' : 'Upload'}</button>
+          <button type="submit" form="asset-form" className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : asset ? 'Save' : 'Upload'}</button>
+        </>
+      }
+    >
+      <form id="asset-form" onSubmit={submit} className="space-y-5">
+        {!asset ? (
+          <div>
+            <span className={label}>File</span>
+            <FileField
+              file={file}
+              accept={ACCEPT}
+              hint="PNG, JPEG, MP4 or PDF. Up to 50 MB."
+              onChange={(f) => { setFile(f); if (f) { setName(stripExt(f.name)); setLbl(guessLabel(f)); setErr(null) } }}
+            />
+          </div>
+        ) : null}
+        <div>
+          <label className={label} htmlFor="b-name">Name</label>
+          <input id="b-name" data-autofocus={asset ? true : undefined} className={field} value={name} maxLength={200} onChange={(e) => setName(e.target.value)} placeholder="e.g. DEXA logo, navy" />
+        </div>
+        <div>
+          <label className={label} htmlFor="b-label">Label</label>
+          <Combobox id="b-label" value={lbl} onChange={setLbl} options={LABELS} maxLength={60} placeholder="What is this asset?" />
         </div>
       </form>
-    </div>
+    </Dialog>
   )
 }

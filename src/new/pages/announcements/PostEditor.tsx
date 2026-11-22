@@ -5,6 +5,9 @@ import { checkPostImage, describe, postImageUrl, todayStr, unwrap, uploadPostIma
 import { btn, btnGhost, btnPrimary, field, label } from '../calendar/cal'
 import { PostView } from './PostView'
 import { cn } from '@/lib/utils'
+import { Dialog } from '@/components/ui/dialog'
+import { DatePicker } from '@/components/ui/date-picker'
+import { Note } from '@/components/ui/note'
 
 export type Post = {
   id: string; title: string; body: string; image_paths: string[]; is_public: boolean
@@ -89,19 +92,26 @@ export function PostEditor({ post, onClose, onSaved }: { post: Post | null; onCl
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background" role="dialog" aria-modal="true" aria-label={post ? 'Edit announcement' : 'New announcement'}>
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={onClose} className={btnGhost + ' !px-2'} aria-label="Close the editor"><X className="size-4" aria-hidden="true" /></button>
-          <h2 className="text-sm font-medium">{post ? 'Edit announcement' : 'New announcement'}</h2>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className={btn} onClick={onClose}>Cancel</button>
-          <button type="submit" form="post-form" className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : post ? 'Save changes' : 'Publish'}</button>
-        </div>
-      </header>
-
-      <div className="grid min-h-0 flex-1 lg:grid-cols-2">
+    <Dialog
+      open
+      onClose={onClose}
+      variant="full"
+      label={post ? 'Edit announcement' : 'New announcement'}
+      bodyClassName="overflow-hidden p-0"
+      header={
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onClose} className={btnGhost + ' !px-2'} aria-label="Close the editor"><X className="size-4" aria-hidden="true" /></button>
+            <h2 className="text-sm font-medium">{post ? 'Edit announcement' : 'New announcement'}</h2>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className={btn} onClick={onClose}>Cancel</button>
+            <button type="submit" form="post-form" className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : post ? 'Save changes' : 'Publish'}</button>
+          </div>
+        </header>
+      }
+    >
+      <div className="grid h-full min-h-0 lg:grid-cols-2">
         <form id="post-form" onSubmit={submit} className="min-h-0 overflow-y-auto px-5 py-8 sm:px-8 lg:border-r lg:border-border">
           <div className="mx-auto max-w-xl space-y-6">
             <div>
@@ -165,7 +175,7 @@ export function PostEditor({ post, onClose, onSaved }: { post: Post | null; onCl
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
                 <label className={label} htmlFor="p-date">Date</label>
-                <input id="p-date" type="date" className={field} value={date} onChange={(e) => setDate(e.target.value || todayStr())} />
+                <DatePicker id="p-date" value={date} onChange={(v) => setDate(v || todayStr())} />
                 <p className="mt-1.5 text-xs text-muted-foreground">Set an earlier date to backdate the post.</p>
               </div>
               <div>
@@ -182,7 +192,7 @@ export function PostEditor({ post, onClose, onSaved }: { post: Post | null; onCl
               </div>
             </div>
 
-            {err ? <p className="rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{err}</p> : null}
+            {err ? <Note>{err}</Note> : null}
           </div>
         </form>
 
@@ -193,6 +203,6 @@ export function PostEditor({ post, onClose, onSaved }: { post: Post | null; onCl
           </div>
         </aside>
       </div>
-    </div>
+    </Dialog>
   )
 }

@@ -90,17 +90,28 @@ export const STATUS_LABEL: Record<Status, string> = {
   scheduled: 'Scheduled', ran: 'Ran', done: 'Done', reviewed: 'Reviewed', cancelled: 'Cancelled',
 }
 
-/** Colours come from the New Forge palette only: blue, navy, greys, and red for problems. */
+/**
+ * How an item looks: a soft tint and a full outline, never a coloured bar on one side. Text stays readable
+ * (white or grey), and only the small icon carries the colour. Palette only: blue, navy, greys, red for problems.
+ */
 export function tone(e: Ev, now = new Date()) {
-  if (e.status === 'cancelled') return 'border-border bg-muted text-muted-foreground line-through'
-  if (isOverdue(e, now)) return 'border-destructive bg-destructive/15 text-destructive'
+  if (e.status === 'cancelled') return 'border-border bg-muted/60 text-muted-foreground line-through'
+  if (isOverdue(e, now)) return 'border-destructive/50 bg-destructive/10 text-foreground'
   if (e.kind === 'prompt') {
-    if (e.status === 'ran') return 'border-primary bg-accent text-accent-foreground'
-    if (e.status === 'done') return 'border-muted-foreground bg-secondary text-foreground'
-    if (e.status === 'reviewed') return 'border-foreground bg-secondary text-foreground'
-    return 'border-primary bg-primary/15 text-primary'
+    if (e.status === 'ran') return 'border-primary/50 bg-accent/50 text-foreground'
+    if (e.status === 'done') return 'border-border bg-secondary/70 text-muted-foreground'
+    if (e.status === 'reviewed') return 'border-foreground/25 bg-secondary text-foreground'
+    return 'border-primary/40 bg-primary/10 text-foreground'
   }
-  return 'border-primary/70 bg-secondary text-foreground'
+  return 'border-border bg-secondary text-foreground'
+}
+
+/** Colour of the small icon on an item. */
+export function accent(e: Ev, now = new Date()) {
+  if (e.status === 'cancelled') return 'text-muted-foreground'
+  if (isOverdue(e, now)) return 'text-destructive'
+  if (e.kind === 'prompt' && (e.status === 'scheduled' || e.status === 'ran')) return 'text-primary'
+  return 'text-muted-foreground'
 }
 
 /** What a person should read when the database says no. */

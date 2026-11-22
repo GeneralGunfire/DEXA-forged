@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useEscape } from '@/components/ui/dialog'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -51,18 +53,18 @@ export function Lightbox({ urls, start, onClose }: { urls: string[]; start: numb
   const [i, setI] = useState(start)
   const n = urls.length
   const go = (d: number) => setI((x) => (x + d + n) % n)
+  useEscape(onClose)
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      else if (e.key === 'ArrowRight') go(1)
+      if (e.key === 'ArrowRight') go(1)
       else if (e.key === 'ArrowLeft') go(-1)
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n])
-  return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black/95" role="dialog" aria-modal="true" aria-label="Image viewer" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+  return createPortal(
+    <div className="nf-fade fixed inset-0 z-[60] flex flex-col bg-black/95" role="dialog" aria-modal="true" aria-label="Image viewer" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="flex items-center justify-between px-5 py-4 text-sm text-muted-foreground">
         <span className="tabular-nums">{i + 1} / {n}</span>
         <button type="button" onClick={onClose} aria-label="Close the viewer" className="rounded-md p-2 hover:bg-secondary hover:text-foreground"><X className="size-5" aria-hidden="true" /></button>
@@ -76,6 +78,7 @@ export function Lightbox({ urls, start, onClose }: { urls: string[]; start: numb
           </>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.getElementById('nf-root') ?? document.body,
   )
 }

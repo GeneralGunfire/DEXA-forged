@@ -1,11 +1,16 @@
-import { useState } from 'react'
-import { Check, Copy, Pencil, X } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Check, Copy, Pencil } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { unwrap, useLoad } from '../../../lib/data'
 import {
   btn, btnGhost, btnPrimary, dateTimeLabel, dayKey, field, isOverdue, label, longDay, plainError, STATUS_LABEL,
   timeLabel, tone, type Ev, type Item, type Person, type Prompt, type Resp,
 } from './cal'
+import { Dialog, CloseButton } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Note } from '@/components/ui/note'
+import { TagPill } from './Views'
+import { cn } from '@/lib/utils'
 
 const when = (e: Ev) => {
   if (e.all_day) return `${longDay(dayKey(e.starts_at))} (all day)`
@@ -22,19 +27,31 @@ const Meta = ({ k, children }: { k: string; children: React.ReactNode }) => (
   </div>
 )
 
-/** Slide-in panel for one calendar item. Every piece of text from prompts and responses is shown as plain text. */
+/** Which button a message belongs to, so it can sit directly under that button. */
+type Kind = 'ran' | 'respond' | 'tick' | 'cancel' | 'copy'
+type Msg = { kind: Kind; ok: boolean; text: string }
+const WAIT_MS = 20000
+
+/**
+ * Side panel for one calendar item. Every piece of text from prompts and responses is shown as plain text.
+ *
+ * Every action here reports what happened, right under its own button: it never fails silently. Each action has its
+ * own "working" state (one stuck action cannot disable another), each call gives up with a clear message after
+ * 20 seconds, and an upload is checked afterwards to make sure the response really exists.
+ */
 export function ItemPanel({ ev, prompt, items, people, dbName, me, onClose, onChanged, onEdit }: {
   ev: Ev; prompt?: Prompt; items: Item[]; people: Person[]; dbName?: string; me: string
   onClose: () => void; onChanged: () => void; onEdit: () => void
 }) {
   const now = new Date()
   const overdue = isOverdue(ev, now)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [pending, setPending] = useState<Kind | null>(null)
+  const [msg, setMsg] = useState<Msg | null>(null)
   const [responding, setResponding] = useState(false)
   const [text, setText] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const lock = useRef<Kind | null>(null) // set the moment an action starts, so a double click cannot send it twice
 
   const responses = useLoad<Resp[]>(async () => {
     if (!prompt) return []
@@ -46,51 +63,96 @@ export function ItemPanel({ ev, prompt, items, people, dbName, me, onClose, onCh
   const cancelled = ev.status === 'cancelled'
   const reviewed = ev.status === 'reviewed'
 
-  async function run(fn: () => PromiseLike<{ error: unknown }>, after?: () => void) {
-    if (busy) return
-    setBusy(true); setError(null)
+  /** Run one action. It reports success or failure under its own button, and never just does nothing. */
+  async function run(
+    kind: Kind,
+    fn: () => PromiseLike<{ error: unknown }>,
+    opts: { after?: () => void; ok?: string; verify?: () => Promise<string | null> } = {},
+  ) {
+    if (lock.current) { setMsg({ kind, ok: false, text: 'Still finishing the last action. Wait a moment, then try again.' }); return }
+    lock.current = kind
+    setPending(kind); setMsg(null)
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
-      const { error: err } = await fn()
-      if (err) throw err
-      after?.()
+      const gaveUp = new Promise<never>((_, no) => { timer = setTimeout(() => no(new Error('The server did not answer within 20 seconds, so nothing was changed. Check your connection and try again.')), WAIT_MS) })
+      const res = await Promise.race([Promise.resolve(fn()), gaveUp])
+      if (res.error) throw res.error
+      const problem = opts.verify ? await opts.verify() : null
+      if (problem) throw new Error(problem)
+      opts.after?.()
+      if (opts.ok) setMsg({ kind, ok: true, text: opts.ok })
       onChanged()
       responses.reload()
     } catch (err) {
-      setError(plainError(err))
+      console.error('[New Forge] item panel action failed:', kind, err)
+      setMsg({ kind, ok: false, text: plainError(err) })
     } finally {
-      setBusy(false)
+      clearTimeout(timer)
+      lock.current = null
+      setPending(null)
     }
   }
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(prompt?.prompt_text ?? ''); setCopied(true); setTimeout(() => setCopied(false), 1800) }
-    catch { setError('Could not copy. Select the text and copy it by hand.') }
+    try { await navigator.clipboard.writeText(prompt?.prompt_text ?? ''); setCopied(true); setMsg(null); setTimeout(() => setCopied(false), 1800) }
+    catch { setMsg({ kind: 'copy', ok: false, text: 'Could not copy automatically. Select the text in the box and copy it by hand.' }) }
   }
 
   const tick = (i: Item) =>
-    run(() => supabase.from('calendar_checklist_items').update(
+    run('tick', () => supabase.from('calendar_checklist_items').update(
       i.done_at ? { done_at: null, done_by: null, updated_at: new Date().toISOString() } : { done_at: new Date().toISOString(), done_by: me, updated_at: new Date().toISOString() },
     ).eq('id', i.id))
 
+  const respond = () => {
+    if (!prompt) return
+    const before = responses.data?.length ?? 0
+    return run('respond', () => supabase.rpc('prompt_respond', { p_tag: prompt.tag, p_body: text.trim() }), {
+      after: () => { setResponding(false); setText('') },
+      ok: `Uploaded. ${prompt.tag} is now marked done.`,
+      // the server said "ok": make sure a new response really exists before telling the person it worked
+      verify: async () => {
+        const { count, error } = await supabase.from('prompt_responses').select('id', { count: 'exact', head: true }).eq('prompt_id', prompt.id)
+        if (error || count === null) return null
+        return count > before ? null : 'The server accepted the upload but no new response was saved, so nothing was marked done. Press Refresh and look again, and tell the team if it happens twice.'
+      },
+    })
+  }
+
   const cancelItem = () =>
-    run(() => supabase.from('calendar_events').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', ev.id), () => setConfirming(false))
+    run('cancel', () => supabase.from('calendar_events').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', ev.id), { after: () => setConfirming(false) })
+
+  const under = (k: Kind) => (msg && msg.kind === k ? <Note ok={msg.ok}>{msg.text}</Note> : null)
+
+  const header = (
+    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 py-4">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{ev.kind === 'prompt' ? 'Prompt' : ev.category}</span>
+          {prompt ? <TagPill tag={prompt.tag} /> : null}
+          <span className={cn('rounded-full border px-2 text-[11px] font-medium leading-5', tone(ev, now))}>{overdue ? 'Overdue' : STATUS_LABEL[ev.status]}</span>
+        </div>
+        <h2 className={cn('mt-2 text-xl font-semibold tracking-tight', cancelled && 'line-through opacity-60')}>{ev.title}</h2>
+      </div>
+      <CloseButton onClose={onClose} />
+    </div>
+  )
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60" role="dialog" aria-modal="true" aria-label={ev.title} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <aside className="flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-border bg-background p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">{ev.kind === 'prompt' ? 'Prompt' : ev.category}</span>
-              {prompt ? <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">{prompt.tag}</span> : null}
-              <span className={`rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${tone(ev, now)}`}>{overdue ? 'Overdue' : STATUS_LABEL[ev.status]}</span>
-            </div>
-            <h2 className={`mt-2 text-2xl font-semibold tracking-tight ${cancelled ? 'line-through opacity-60' : ''}`}>{ev.title}</h2>
-          </div>
-          <button type="button" onClick={onClose} className={btnGhost + ' !px-2'} aria-label="Close"><X className="size-4" aria-hidden="true" /></button>
-        </div>
-
-        <dl className="mt-5 divide-y divide-border border-y border-border">
+    <>
+      <Dialog
+        open
+        variant="sheet"
+        onClose={onClose}
+        header={header}
+        label={ev.title}
+        footer={!cancelled ? (
+          <>
+            {ev.kind === 'event' ? <button type="button" className={btn} onClick={onEdit}><Pencil className="size-4" aria-hidden="true" /> Edit</button> : null}
+            <button type="button" className={cn(btnGhost, 'mr-auto')} onClick={() => { setMsg(null); setConfirming(true) }}>Cancel this item</button>
+          </>
+        ) : undefined}
+      >
+        <dl className="divide-y divide-border border-y border-border">
           <Meta k={ev.kind === 'prompt' ? 'Due' : 'When'}>{when(ev)}</Meta>
           <Meta k="Assignee">{ev.assignee ?? <span className="text-muted-foreground">Nobody</span>}</Meta>
           {ev.kind === 'event' ? <Meta k="Attendees">{attendees.length ? attendees.join(', ') : <span className="text-muted-foreground">None</span>}</Meta> : null}
@@ -113,16 +175,15 @@ export function ItemPanel({ ev, prompt, items, people, dbName, me, onClose, onCh
             <ul className="divide-y divide-border">
               {list.map((i) => (
                 <li key={i.id} className="py-2.5">
-                  <label className="flex items-start gap-3 text-sm">
-                    <input type="checkbox" className="mt-0.5 size-4 accent-primary" checked={!!i.done_at} disabled={busy || !me || cancelled} onChange={() => tick(i)} />
-                    <span className="min-w-0 flex-1">
-                      <span className={i.done_at ? 'text-muted-foreground line-through' : ''}>{i.text}</span>
-                      {i.done_at ? <span className="mt-0.5 block text-xs text-muted-foreground">{i.done_by}, {dateTimeLabel(i.done_at)}</span> : null}
-                    </span>
-                  </label>
+                  <Checkbox checked={!!i.done_at} disabled={pending === 'tick' || !me || cancelled} onChange={() => tick(i)} className="w-full">
+                    <span className={i.done_at ? 'text-muted-foreground line-through' : ''}>{i.text}</span>
+                    {i.done_at ? <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{i.done_by}, {dateTimeLabel(i.done_at)}</span> : null}
+                  </Checkbox>
                 </li>
               ))}
             </ul>
+            {!me ? <p className="mt-2 text-xs text-muted-foreground">Your name is still loading. Ticking becomes available in a moment.</p> : null}
+            {under('tick')}
           </section>
         ) : null}
 
@@ -137,6 +198,7 @@ export function ItemPanel({ ev, prompt, items, people, dbName, me, onClose, onCh
                 </button>
               </div>
               <textarea readOnly value={prompt.prompt_text} aria-label="Prompt text" className={field + ' h-48 resize-y font-mono text-xs leading-5'} />
+              {under('copy')}
             </section>
 
             {prompt.paste_back ? (
@@ -175,47 +237,56 @@ export function ItemPanel({ ev, prompt, items, people, dbName, me, onClose, onCh
                 {responding ? (
                   <div>
                     <label className={label} htmlFor="resp">Your response</label>
-                    <textarea id="resp" className={field + ' min-h-36 resize-y'} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
+                    <textarea id="resp" data-autofocus className={field + ' min-h-36 resize-y'} value={text} onChange={(e) => setText(e.target.value)} />
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
                       Counts only. No patient data, passwords or keys. Text that looks like these is rejected.
                     </p>
                     <div className="mt-3 flex gap-2">
-                      <button type="button" className={btnPrimary} disabled={busy || !text.trim()} onClick={() => run(() => supabase.rpc('prompt_respond', { p_tag: prompt.tag, p_body: text.trim() }), () => { setResponding(false); setText('') })}>
-                        {busy ? 'Uploading…' : 'Upload and mark done'}
+                      <button type="button" className={btnPrimary} disabled={pending === 'respond' || !text.trim()} onClick={respond}>
+                        {pending === 'respond' ? 'Uploading…' : 'Upload and mark done'}
                       </button>
-                      <button type="button" className={btn} onClick={() => { setResponding(false); setError(null) }}>Not now</button>
+                      <button type="button" className={btn} disabled={pending === 'respond'} onClick={() => { setResponding(false); setMsg(null) }}>Not now</button>
                     </div>
+                    {/* your text stays in the box if anything goes wrong */}
+                    {under('respond')}
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {ev.status === 'scheduled' ? (
-                      <button type="button" className={btn} disabled={busy} onClick={() => run(() => supabase.rpc('prompt_mark_ran', { p_tag: prompt.tag }))}>I ran it</button>
-                    ) : null}
-                    <button type="button" className={btnPrimary} onClick={() => { setResponding(true); setError(null) }}>Respond</button>
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      {ev.status === 'scheduled' ? (
+                        <button type="button" className={btn} disabled={pending === 'ran'} onClick={() => run('ran', () => supabase.rpc('prompt_mark_ran', { p_tag: prompt.tag }), { ok: 'Marked as run.' })}>
+                          {pending === 'ran' ? 'Saving…' : 'I ran it'}
+                        </button>
+                      ) : null}
+                      <button type="button" className={btnPrimary} onClick={() => { setResponding(true); setMsg(null) }}>Respond</button>
+                    </div>
+                    {under('ran')}
+                    {under('respond')}
                   </div>
                 )}
               </section>
             ) : null}
           </>
         ) : null}
+      </Dialog>
 
-        {error ? <p className="mt-5 rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{error}</p> : null}
-
-        {!cancelled ? (
-          <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-5" style={{ marginTop: '2rem' }}>
-            {ev.kind === 'event' ? <button type="button" className={btn} onClick={onEdit}><Pencil className="size-4" aria-hidden="true" /> Edit</button> : null}
-            {confirming ? (
-              <>
-                <span className="text-sm text-muted-foreground">Cancel this item? It stays in the calendar, marked cancelled.</span>
-                <button type="button" className={btn + ' !border-destructive !text-destructive'} disabled={busy} onClick={cancelItem}>Yes, cancel it</button>
-                <button type="button" className={btn} onClick={() => setConfirming(false)}>Keep it</button>
-              </>
-            ) : (
-              <button type="button" className={btnGhost} onClick={() => setConfirming(true)}>Cancel this item</button>
-            )}
-          </div>
-        ) : null}
-      </aside>
-    </div>
+      <Dialog
+        open={confirming}
+        onClose={() => { if (pending !== 'cancel') setConfirming(false) }}
+        title="Cancel this item?"
+        size="sm"
+        footer={
+          <>
+            <button type="button" className={btn} disabled={pending === 'cancel'} onClick={() => setConfirming(false)}>Keep it</button>
+            <button type="button" data-autofocus className={cn(btn, '!border-destructive !text-destructive hover:!bg-destructive/10')} disabled={pending === 'cancel'} onClick={cancelItem}>
+              {pending === 'cancel' ? 'Cancelling…' : 'Yes, cancel it'}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm leading-6 text-muted-foreground">“{ev.title}” stays in the calendar, marked as cancelled. Nothing is deleted.</p>
+        {under('cancel')}
+      </Dialog>
+    </>
   )
 }

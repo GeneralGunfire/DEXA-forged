@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Inbox, RefreshCw, Search, Star } from 'lucide-react'
+import { ArrowLeft, Inbox, RefreshCw, Search, Star, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { describe, fmtDate, unwrap, useLoad } from '../../../lib/data'
 import { btn, btnPrimary, field, label } from '../calendar/cal'
 import { cn } from '@/lib/utils'
+import { Select } from '@/components/ui/select'
 
 // Everything in a feedback row came from outside (anonymous inserts are allowed), so it is shown as plain text only.
 export type Row = {
@@ -112,7 +113,8 @@ export default function Feedback() {
           <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-border pt-6">
             <div className="relative min-w-56 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <input className={field + ' pl-9'} type="search" placeholder="Search messages, pages, tags and notes" aria-label="Search feedback" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input className={field + ' pl-9 pr-9'} type="search" placeholder="Search messages, pages, tags and notes" aria-label="Search feedback" value={q} onChange={(e) => setQ(e.target.value)} />
+              {q ? <button type="button" aria-label="Clear the search" onClick={() => setQ('')} className="absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground"><X className="size-4" aria-hidden="true" /></button> : null}
             </div>
             <Seg name="Status" value={status} onChange={setStatus} options={[{ v: 'all', t: 'All' }, ...STATUSES]} />
             <Seg name="Source" value={source} onChange={setSource} options={[{ v: 'all', t: 'Any source' }, ...SOURCES.map((s) => ({ v: s, t: s[0].toUpperCase() + s.slice(1) }))]} />
@@ -194,9 +196,7 @@ function Detail({ row, onBack, onSaved }: { row: Row; onBack: () => void; onSave
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
         <div>
           <label className={label} htmlFor="f-status">Status</label>
-          <select id="f-status" className={field} value={status} onChange={(e) => setStatus(e.target.value as Row['status'])}>
-            {STATUSES.map((s) => <option key={s.v} value={s.v}>{s.t}</option>)}
-          </select>
+          <Select id="f-status" value={status} onChange={(v) => setStatus(v as Row['status'])} options={STATUSES.map((s) => ({ value: s.v as string, label: s.t }))} />
         </div>
         <div>
           <label className={label} htmlFor="f-tags">Tags</label>

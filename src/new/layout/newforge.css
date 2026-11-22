@@ -86,3 +86,17 @@
 @supports not selector(::-webkit-scrollbar) {
   .nf *, .nf { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 }
+
+/* popups and floating panels: a short fade and rise (and none at all if the person asked for less motion) */
+@keyframes nf-pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes nf-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nf-rise { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+.nf .nf-pop { animation: nf-pop .12s ease-out; }
+.nf .nf-fade { animation: nf-fade .15s ease-out; }
+.nf .nf-rise { animation: nf-rise .18s cubic-bezier(.2,.7,.2,1); }
+@media (prefers-reduced-motion: reduce) { .nf .nf-pop, .nf .nf-fade, .nf .nf-rise { animation: none; } }
+
+/* the browser's own "x" and focus ring on search boxes would clash with ours */
+.nf input[type='search']::-webkit-search-cancel-button, .nf input[type='search']::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.nf input, .nf textarea, .nf select { color-scheme: dark; }
+
