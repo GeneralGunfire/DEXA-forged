@@ -15,10 +15,18 @@ import {
 } from './EstateShared'
 
 type DbName = Pick<Db, 'id' | 'name'>
-const COLS = 'md:grid-cols-[minmax(0,2.6fr)_5.5rem_4.5rem_8.5rem_minmax(0,1.4fr)_4.5rem]'
+const COLS = 'md:grid-cols-[minmax(0,2.6fr)_6.5rem_4.5rem_8rem_minmax(0,1.4fr)_4.5rem]'
 const PRIORITY_TONE: Record<Priority, string> = { must: 'border-primary/50 bg-primary/10 text-foreground', should: 'border-border bg-secondary text-foreground', could: 'border-border text-muted-foreground' }
 const KIND_TONE: Record<ReqKind, string> = { requirement: 'border-border bg-secondary text-foreground', risk: 'border-destructive/50 text-destructive', question: 'border-primary/50 bg-primary/10 text-foreground' }
-const chip = 'inline-block rounded-full border px-2 text-[11px] font-medium leading-5'
+const STATUS_TONE: Record<ReqStatus, string> = {
+  proposed: 'border-border bg-secondary text-foreground',
+  agreed: 'border-primary/50 bg-primary/10 text-foreground',
+  done: 'border-border text-muted-foreground',
+  dropped: 'border-border text-muted-foreground line-through',
+}
+const chip = 'inline-flex items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-5'
+/** A question that has not been closed yet: easy to spot in the list. */
+const isOpenQuestion = (r: Pick<Requirement, 'kind' | 'status'>) => r.kind === 'question' && r.status !== 'done' && r.status !== 'dropped'
 
 export function EstateRequirements({ reqs, dbs, reload }: { reqs: Requirement[]; dbs: DbName[]; reload: () => void }) {
   const [f, setF] = useState(NO_REQ_FILTERS)
@@ -29,6 +37,7 @@ export function EstateRequirements({ reqs, dbs, reload }: { reqs: Requirement[];
   const shown = useMemo(() => filterRequirements(reqs, f), [reqs, f])
   const groups = useMemo(() => groupByArea(shown), [shown])
   const filtering = activeReqFilters(f) > 0
+  const openQuestions = reqs.filter(isOpenQuestion).length
   const dbName = (id: string | null) => dbs.find((d) => d.id === id)?.name ?? null
 
   async function setStatus(r: Requirement, status: ReqStatus) {
@@ -52,9 +61,19 @@ export function EstateRequirements({ reqs, dbs, reload }: { reqs: Requirement[];
         <button type="button" className={cn(btn, 'ml-auto')} onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden="true" /> Add requirement</button>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick filter">
+        <button type="button" aria-pressed={f.kind === ''} onClick={() => set('kind')('')} className={cn('rounded-full border px-3 py-1 text-xs font-medium transition-colors', f.kind === '' ? 'border-primary bg-primary/15 text-foreground' : 'border-border text-muted-foreground hover:text-foreground')}>All kinds</button>
+        {REQ_KINDS.map((k) => (
+          <button key={k} type="button" aria-pressed={f.kind === k} onClick={() => set('kind')(f.kind === k ? '' : k)}
+            className={cn('rounded-full border px-3 py-1 text-xs font-medium transition-colors', f.kind === k ? 'border-primary bg-primary/15 text-foreground' : 'border-border text-muted-foreground hover:text-foreground')}>
+            {KIND_LABEL[k]}s · {reqs.filter((r) => r.kind === k).length}
+          </button>
+        ))}
+        <span className="ml-2 text-xs text-muted-foreground">Open questions are highlighted: {openQuestions} {openQuestions === 1 ? 'is' : 'are'} still open.</span>
+      </div>
+
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <div className="w-48"><Select aria-label="Area" value={f.area} onChange={set('area')} options={[any('All areas'), ...TOPICS.map((t) => ({ value: t.value as string, label: t.label }))]} /></div>
-        <div className="w-36"><Select aria-label="Kind" value={f.kind} onChange={set('kind')} options={[any('All kinds'), ...REQ_KINDS.map((k) => ({ value: k as string, label: KIND_LABEL[k] }))]} /></div>
         <div className="w-36"><Select aria-label="Priority" value={f.priority} onChange={set('priority')} options={[any('All priorities'), ...PRIORITIES.map((p) => ({ value: p as string, label: PRIORITY_LABEL[p] }))]} /></div>
         <div className="w-36"><Select aria-label="Status" value={f.status} onChange={set('status')} options={[any('All statuses'), ...REQ_STATUSES.map((s) => ({ value: s as string, label: STATUS_LABEL[s] }))]} /></div>
         <div className="w-52"><Select aria-label="Database" value={f.database} onChange={set('database')} options={[any('All databases'), { value: NO_DB, label: 'No database' }, ...dbs.map((d) => ({ value: d.id, label: d.name }))]} /></div>
@@ -81,16 +100,16 @@ export function EstateRequirements({ reqs, dbs, reload }: { reqs: Requirement[];
                   {g.rows.map((r) => {
                     const name = dbName(r.database_id)
                     return (
-                      <li key={r.id} className={cn('grid items-start gap-x-4 gap-y-2 px-2 py-3', COLS, r.status === 'dropped' && 'opacity-60')}>
+                      <li key={r.id} className={cn('grid items-start gap-x-4 gap-y-2 px-2 py-3', COLS, r.status === 'dropped' && 'opacity-60', isOpenQuestion(r) && 'bg-primary/[0.06]')}>
                         <div className="min-w-0">
                           <p className={cn('break-words text-sm font-medium leading-snug', r.status === 'dropped' && 'line-through')}>{r.title}</p>
                           {r.detail ? <p className="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">{r.detail}</p> : null}
-                          {r.source_note ? <p className="mt-1 break-words text-[11px] leading-4 text-muted-foreground">Source: {r.source_note}</p> : null}
+                          {r.source_note ? <p className="mt-1.5 break-words text-[11px] leading-4 text-muted-foreground"><span className="font-medium text-foreground/80">Source:</span> {r.source_note}</p> : null}
                           {msg?.id === r.id ? <Note>{msg.text}</Note> : null}
                         </div>
-                        <span><span className={cn(chip, KIND_TONE[r.kind])}>{KIND_LABEL[r.kind]}</span></span>
+                        <span><span className={cn(chip, KIND_TONE[r.kind])}>{r.kind === 'question' ? <span aria-hidden="true" className="grid size-3.5 place-items-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">?</span> : null}{KIND_LABEL[r.kind]}</span></span>
                         <span><span className={cn(chip, PRIORITY_TONE[r.priority])}>{PRIORITY_LABEL[r.priority]}</span></span>
-                        <div className="w-32 md:w-auto"><Select aria-label={`Status of ${r.title}`} value={r.status} disabled={busy === r.id} onChange={(v) => setStatus(r, v as ReqStatus)} options={REQ_STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))} /></div>
+                        <div className="w-32 md:w-auto"><Select aria-label={`Status of ${r.title}`} value={r.status} className={cn('!h-7 !rounded-full !px-2.5 !text-xs', STATUS_TONE[r.status])} disabled={busy === r.id} onChange={(v) => setStatus(r, v as ReqStatus)} options={REQ_STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))} /></div>
                         <span className="min-w-0 truncate text-sm">
                           {r.database_id ? (name ? <Link to={`/new/work/plan/${r.database_id}`} className="text-primary hover:underline" title={`Open the plan for ${name}`}>{name}</Link> : <span className="text-muted-foreground">Unknown database</span>) : <span className="text-muted-foreground">None</span>}
                         </span>
