@@ -1,5 +1,5 @@
 import {
-  Bell, BookOpen, Briefcase, CalendarDays, Database, FileText, FolderOpen, Globe2, Image, LayoutGrid,
+  Bell, BookOpen, Briefcase, CalendarDays, Database, FileText, FolderOpen, Globe2, Image, Landmark, LayoutGrid,
   ListChecks, MessageSquareHeart, Settings, Waypoints, type LucideIcon,
 } from 'lucide-react'
 
@@ -31,6 +31,7 @@ export const ALL_GROUPS: NavGroup[] = [
     items: [
       { label: 'Plan', to: '/new/work/plan', icon: ListChecks },
       { label: 'Progress', to: '/new/work/progress', icon: Waypoints },
+      { label: 'Estate', to: '/new/work/estate', icon: Landmark },
     ],
   },
 ]
