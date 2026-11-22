@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronRight, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { describe, unwrap, useLoad, useMe, useTeam } from '../../../lib/data'
@@ -68,6 +68,9 @@ export function TimelineTab({ db }: { db: Db }) {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
   const [fixedOpen, setFixedOpen] = useState<Record<string, boolean>>({})
   const [editing, setEditing] = useState<{ entry?: Entry; preset?: Partial<Entry> } | null>(null)
+  const [params] = useSearchParams()
+  const focus = params.get('entry')
+  const [flash, setFlash] = useState<string | null>(null)
 
   const all = entries.data ?? []
   const filtering = !!(q || type || author || phase)
@@ -95,11 +98,33 @@ export function TimelineTab({ db }: { db: Db }) {
   const open = all.filter((e) => e.type === 'Error' && e.status !== 'Resolved').length
 
   const row = (n: Node, depth: number): React.ReactNode => (
-    <Row key={n.entry.id} node={n} depth={depth} all={all} docs={docs.data ?? []} dbId={db.id} open={openIds.has(n.entry.id)} onToggle={toggle} render={row}
+    <Row key={n.entry.id} node={n} depth={depth} all={all} docs={docs.data ?? []} dbId={db.id} open={openIds.has(n.entry.id)} flash={flash === n.entry.id} onToggle={toggle} render={row}
       onEdit={(entry) => setEditing({ entry })} onReply={(parent, t) => setEditing({ preset: { parent_id: parent.id, type: t, phase: parent.phase } })} onChanged={reload} />
   )
 
   const clear = () => { setQ(''); setType(''); setAuthor(''); setPhase('') }
+
+  // a link such as ?tab=Timeline&entry=<id> opens that entry, opens any collapsed group holding it, and scrolls to it
+  useEffect(() => {
+    if (!focus || entries.loading || all.length === 0) return
+    const target = all.find((e) => e.id === focus)
+    if (!target) return
+    if (!shown.some((e) => e.id === focus)) { clear(); return } // a filter was hiding it; this runs again once the filters are clear
+    let root = target
+    while (root.parent_id) { const up = all.find((x) => x.id === root.parent_id); if (!up) break; root = up }
+    if (root.type === 'Error' && root.status === 'Resolved') setFixedOpen((o) => ({ ...o, [root.phase || 'Other']: true }))
+    setOpenIds((s) => new Set(s).add(focus))
+    const t = setTimeout(() => {
+      const el = document.getElementById(`e-${focus}`)
+      if (!el) return
+      const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      el.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' })
+      setFlash(focus)
+      setTimeout(() => setFlash(null), 2600)
+    }, 150)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, entries.loading, all.length, shown.length])
 
   return (
     <div>
@@ -193,8 +218,8 @@ export function TimelineTab({ db }: { db: Db }) {
 
 /* ---------------- one entry (and the entries that answer it) ---------------- */
 
-function Row({ node, depth, all, docs, dbId, open, onToggle, render, onEdit, onReply, onChanged }: {
-  node: Node; depth: number; all: Entry[]; docs: DocLink[]; dbId: string; open: boolean; onToggle: (id: string) => void
+function Row({ node, depth, all, docs, dbId, open, flash, onToggle, render, onEdit, onReply, onChanged }: {
+  node: Node; depth: number; all: Entry[]; docs: DocLink[]; dbId: string; open: boolean; flash: boolean; onToggle: (id: string) => void
   render: (n: Node, d: number) => React.ReactNode; onEdit: (e: Entry) => void; onReply: (parent: Entry, t: EntryType) => void; onChanged: () => void
 }) {
   const e = node.entry
@@ -214,7 +239,7 @@ function Row({ node, depth, all, docs, dbId, open, onToggle, render, onEdit, onR
   }
 
   return (
-    <li id={`e-${e.id}`} className={cn(depth > 0 && 'ml-4 border-l border-border pl-3 sm:ml-6')}>
+    <li id={`e-${e.id}`} className={cn(depth > 0 && 'ml-4 border-l border-border pl-3 sm:ml-6', flash && 'rounded-md ring-2 ring-primary/70 transition-shadow')}>
       <button type="button" aria-expanded={open} onClick={() => onToggle(e.id)} className="group flex w-full items-start gap-3 rounded-md px-2 py-3 text-left transition-colors hover:bg-secondary/40 focus-visible:outline-2 focus-visible:outline-ring">
         <TypeChip type={e.type} className="mt-0.5 w-[5.5rem] justify-start" />
         <span className="min-w-0 flex-1">

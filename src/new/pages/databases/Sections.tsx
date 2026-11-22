@@ -149,9 +149,12 @@ function Queries({ body }: { body: string }) {
 /* ---------------- the list of sections ---------------- */
 
 /** In-depth sections for one database and area. Titles, summaries and text are shown exactly as stored. */
-export function InDepth({ databaseId, area }: { databaseId: string; area: 'background' | 'build' }) {
-  const { data, error, loading } = useLoad<Section[]>(async () =>
-    unwrap<Section[]>(await supabase.from('db_content').select('id, area, title, summary, kind, body, collapsed, position, updated_at, written_by').eq('area', area).eq('database_id', databaseId).order('position')) ?? [], [databaseId, area])
+export function InDepth({ databaseId, area, plain = false }: { databaseId: string | null; area: 'background' | 'build' | 'estate'; plain?: boolean }) {
+  const { data, error, loading } = useLoad<Section[]>(async () => {
+    let q = supabase.from('db_content').select('id, area, title, summary, kind, body, collapsed, position, updated_at, written_by').eq('area', area)
+    q = databaseId ? q.eq('database_id', databaseId) : q.is('database_id', null) // null = the whole estate
+    return unwrap<Section[]>(await q.order('position')) ?? []
+  }, [databaseId, area])
   const [open, setOpen] = useState<Record<string, boolean>>({})
   if (error) return <p className="mt-10 text-sm text-destructive" role="alert">Could not load the in-depth detail: {error}</p>
   if (loading && !data) return <p className="mt-10 text-sm text-muted-foreground">Loading the in-depth detail…</p>
@@ -184,6 +187,7 @@ export function InDepth({ databaseId, area }: { databaseId: string; area: 'backg
                   {s.kind === 'table' ? <TableView body={s.body} />
                     : s.kind === 'chart' ? <ChartView body={s.body} />
                     : s.kind === 'queries' ? <Queries body={s.body} />
+                    : plain && (s.kind === 'text' || s.kind === 'sources') ? <p className="max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-6 text-foreground/90">{s.body}</p>
                     : <Rich text={s.body} className="max-w-[72ch]" />}
                   <p className="mt-4 text-xs text-muted-foreground">Written by {s.written_by || 'Claude Code'}, updated {fmtDate(s.updated_at)}.</p>
                 </div>
