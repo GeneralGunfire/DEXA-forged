@@ -5,6 +5,7 @@ import { postImageUrl, unwrap, useLoad, useTeam } from '../../../lib/data'
 import { btn, btnPrimary } from '../calendar/cal'
 import { PostView } from './PostView'
 import { dayOf, PostEditor, type Post } from './PostEditor'
+import { Loading } from '@/components/ui/loading'
 
 export default function Announcements() {
   const { name } = useTeam()
@@ -27,7 +28,7 @@ export default function Announcements() {
         {error ? (
           <p className="text-sm text-destructive" role="alert">Could not load the announcements: {error}</p>
         ) : loading && !data ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <Loading variant="cards" />
         ) : data && data.length === 0 ? (
           <div className="border-t border-border py-16 text-center">
             <p className="text-lg font-medium">No announcements yet.</p>

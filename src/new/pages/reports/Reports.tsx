@@ -7,6 +7,7 @@ import { LIMITS_TITLE, MACHINES, TYPE_DOT, TYPE_ORDER, phaseName } from '../data
 import { DatePicker } from '@/components/ui/date-picker'
 import { Select } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 type Db = { id: string; name: string; machine: string }
 type E = { id: string; database_id: string | null; happened_at: string; type: string; phase: string; title: string; status: string | null }
@@ -149,7 +150,7 @@ export default function Reports() {
       </div>
 
       {error ? <p className="mt-10 text-sm text-destructive" role="alert">Could not load the timeline: {describe(error)}</p>
-        : loading ? <p className="mt-10 text-sm text-muted-foreground">Loading…</p>
+        : loading ? <Loading variant="cards" className="mt-10" />
         : (
           <article className="mt-8" aria-label="Status report">
             <div className="nf-printblock">

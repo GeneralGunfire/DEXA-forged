@@ -10,6 +10,7 @@ import { MonthView, TimeGrid, TodayList } from './Views'
 import { EventEditor } from './EventEditor'
 import { ItemPanel } from './ItemPanel'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 type View = 'month' | 'week' | 'day' | 'today'
 type Data = { events: Ev[]; prompts: Prompt[]; people: Person[]; items: Item[]; dbs: Db[] }
@@ -107,7 +108,7 @@ export default function Calendar() {
         {error ? (
           <p className="text-sm text-destructive" role="alert">Could not load the calendar: {error}</p>
         ) : loading && !data ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <Loading variant="rows" />
         ) : view === 'month' ? (
           <MonthView {...common} cursor={cursor} onDay={(k) => { setCursor(k); setView('day') }} />
         ) : view === 'week' ? (

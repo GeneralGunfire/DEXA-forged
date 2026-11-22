@@ -7,6 +7,7 @@ import { btn, btnPrimary } from '../calendar/cal'
 import { DbForm } from './DbForm'
 import { ago, MACHINES, type Db } from './shared'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 type Meta = { n: number; open: number; last: string }
 
@@ -76,7 +77,7 @@ export default function Databases() {
         {dbs.error ? (
           <p className="text-sm text-destructive" role="alert">Could not load the databases: {dbs.error}</p>
         ) : dbs.loading && !dbs.data ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <Loading variant="rows" />
         ) : all.length === 0 ? (
           <div className="border-t border-border py-16 text-center">
             <p className="text-lg font-medium">No databases added yet.</p>

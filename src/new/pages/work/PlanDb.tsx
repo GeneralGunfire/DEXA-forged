@@ -11,6 +11,7 @@ import { PlanDecisions } from './plan/PlanDecisions'
 import { PlanDependencies } from './plan/PlanDependencies'
 import { bar, pct, progress, type ConnOption, type Db, type Decision, type Dep, type Mapping, type PlanSection, type Stage } from './shared'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 type Data = { dbs: Db[]; sections: PlanSection[]; options: ConnOption[]; maps: Mapping[]; stages: Stage[]; decisions: Decision[]; deps: Dep[] }
 
@@ -51,7 +52,7 @@ export default function PlanDb() {
       </div>
 
       {error ? <p className="mt-8 text-sm text-destructive" role="alert">Could not load this plan: {error}</p>
-        : loading && !data ? <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
+        : loading && !data ? <Loading variant="detail" className="mt-8" />
         : data && db ? (
           <>
             <header className="mt-5 flex flex-wrap items-start justify-between gap-4">

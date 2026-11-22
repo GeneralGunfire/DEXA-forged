@@ -7,6 +7,7 @@ import { btn } from '../calendar/cal'
 import { InDepth } from '../databases/Sections'
 import { LIMITS_TITLE, MACHINES } from '../databases/shared'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 type Db = { id: string; name: string; machine: string; status: string; db_type: string }
 type Note = { id: string; database_id: string; happened_at: string; detail: string; summary: string }
@@ -91,7 +92,7 @@ export default function EstateOverview() {
       </header>
 
       {error ? <p className="mt-10 text-sm text-destructive" role="alert">Could not load the estate: {error}</p>
-        : loading ? <p className="mt-10 text-sm text-muted-foreground">Loading…</p>
+        : loading ? <Loading variant="cards" className="mt-10" />
         : all.length === 0 ? <p className="mt-10 border-t border-border pt-10 text-center text-sm text-muted-foreground">No databases yet.</p>
         : (
           <>

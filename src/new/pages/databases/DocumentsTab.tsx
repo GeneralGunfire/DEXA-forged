@@ -11,6 +11,7 @@ import { FileField } from '@/components/ui/file-field'
 import { Note } from '@/components/ui/note'
 import { cn } from '@/lib/utils'
 import type { Db } from './shared'
+import { Loading } from '@/components/ui/loading'
 
 type Doc = {
   id: string; database_id: string; name: string; description: string; document_date: string; path: string; mime: string | null; size: number | null
@@ -68,7 +69,7 @@ export function DocumentsTab({ db }: { db: Db }) {
 
       <div className="mt-6">
         {docs.error ? <p className="text-sm text-destructive" role="alert">Could not load the documents: {docs.error}</p>
-          : docs.loading && !docs.data ? <p className="text-sm text-muted-foreground">Loading…</p>
+          : docs.loading && !docs.data ? <Loading variant="rows" />
           : current.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border px-6 py-16 text-center">
               <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-muted-foreground"><FileText aria-hidden="true" className="size-6" /></span>

@@ -11,6 +11,7 @@ import { FileField } from '@/components/ui/file-field'
 import { Note } from '@/components/ui/note'
 import { cn } from '@/lib/utils'
 import { Viewer, canView, ext, type ViewDoc } from './Viewer'
+import { Loading } from '@/components/ui/loading'
 
 type Table = 'db_documents' | 'documents'
 type Db = { id: string; name: string; machine: string }
@@ -112,7 +113,7 @@ export default function Documents() {
 
       <div className="mt-8">
         {error ? <p className="text-sm text-destructive" role="alert">Could not load the documents: {error}</p>
-          : loading ? <p className="text-sm text-muted-foreground">Loading…</p>
+          : loading ? <Loading variant="cards" />
           : shown.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border px-6 py-16 text-center">
               <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary text-muted-foreground"><FileText aria-hidden="true" className="size-6" /></span>
