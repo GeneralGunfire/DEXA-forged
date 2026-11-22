@@ -1,4 +1,6 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { supabase } from '../../../lib/supabase'
+import { useTeam } from '../../../lib/data'
 import { checkRedaction } from '../../../lib/redact'
 import { btn, btnPrimary } from '../calendar/cal'
 import { Dialog } from '@/components/ui/dialog'
@@ -52,3 +54,19 @@ export const Part = ({ id, title, count, hint, action, children }: { id: string;
 export const Empty = ({ children }: { children: ReactNode }) => (
   <p className="rounded-xl border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground">{children}</p>
 )
+
+/**
+ * True when the signed-in person is on the team list, which is who the database lets edit the plan (admins and members).
+ * It is false until the team list has loaded, so edit-only controls never flash up for the wrong person. The database
+ * still decides: a refused change shows its message.
+ */
+export function useCanEdit() {
+  const { team } = useTeam()
+  const [id, setId] = useState<string | null>(null)
+  useEffect(() => {
+    let on = true
+    supabase.auth.getSession().then(({ data }) => { if (on) setId(data.session?.user.id ?? null) })
+    return () => { on = false }
+  }, [])
+  return !!id && team.some((t) => t.user_id === id)
+}

@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { Pencil, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react'
 import { supabase } from '../../../../lib/supabase'
 import { unwrap } from '../../../../lib/data'
 import { btn, btnGhost, dateTimeLabel, field, label } from '../../calendar/cal'
 import { Select } from '@/components/ui/select'
 import { Note } from '@/components/ui/note'
 import { cn } from '@/lib/utils'
-import { Empty, FormDialog, Part } from '../FormDialog'
-import { saveError, STAGE_LABEL, STAGE_STATUS, type Stage, type StageStatus } from '../shared'
+import { Empty, FormDialog, Part, useCanEdit } from '../FormDialog'
+import { reorder, saveError, STAGE_LABEL, STAGE_STATUS, type Stage, type StageStatus } from '../shared'
 
 const DOT: Record<StageStatus, string> = { planned: 'bg-muted-foreground/60', in_progress: 'bg-primary', done: 'bg-primary/50', blocked: 'bg-destructive', dropped: 'bg-border' }
 
@@ -15,6 +15,7 @@ export function PlanStages({ dbId, stages, reload }: { dbId: string; stages: Sta
   const [editing, setEditing] = useState<Stage | 'new' | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ id: string; text: string } | null>(null)
+  const canEdit = useCanEdit()
   const list = [...stages].sort((a, b) => a.position - b.position)
 
   async function setStatus(s: Stage, status: StageStatus) {
@@ -25,6 +26,20 @@ export function PlanStages({ dbId, stages, reload }: { dbId: string; stages: Sta
     finally { setBusy(null) }
   }
 
+  /** Move a stage by swapping positions with its neighbour. Both updates are sent together; if either fails we say so and reload. */
+  async function move(s: Stage, dir: 'up' | 'down') {
+    const updates = reorder(list, s.id, dir)
+    if (busy || updates.length === 0) return
+    setBusy(s.id); setMsg(null)
+    try {
+      const results = await Promise.all(updates.map((u) => supabase.from('gw_plan_stages').update({ position: u.position }).eq('id', u.id)))
+      const failed = results.find((r) => r.error)
+      if (failed) throw failed.error
+    } catch (e) {
+      setMsg({ id: s.id, text: `The stage order may be only partly changed, so the list has been reloaded. ${saveError(e, false)}` })
+    } finally { reload(); setBusy(null) }
+  }
+
   return (
     <Part
       id="stages" title="Build stages" count={list.length} hint="The steps to build this gateway, in order. The database records when a stage is marked done."
@@ -33,7 +48,7 @@ export function PlanStages({ dbId, stages, reload }: { dbId: string; stages: Sta
       {list.length === 0 ? <Empty>No stages planned yet.</Empty> : (
         <ol className="divide-y divide-border border-y border-border">
           {list.map((s, i) => (
-            <li key={s.id} className={cn('grid gap-x-4 gap-y-2 px-1 py-4 md:grid-cols-[2rem_minmax(0,1fr)_11rem]', s.status === 'dropped' && 'opacity-60')}>
+            <li key={s.id} className={cn('grid gap-x-4 gap-y-2 px-1 py-4 md:grid-cols-[2rem_minmax(0,1fr)_14rem]', s.status === 'dropped' && 'opacity-60')}>
               <span className="text-sm tabular-nums text-muted-foreground">{i + 1}.</span>
               <div className="min-w-0">
                 <h3 className="flex flex-wrap items-center gap-2 break-words text-sm font-semibold">
@@ -47,6 +62,12 @@ export function PlanStages({ dbId, stages, reload }: { dbId: string; stages: Sta
                 {msg?.id === s.id ? <Note>{msg.text}</Note> : null}
               </div>
               <div className="flex items-start gap-2 md:justify-end">
+                {canEdit ? (
+                  <div className="flex flex-col gap-0.5">
+                    <button type="button" className={cn(btnGhost, '!h-[1.1rem] !w-7 !px-0')} aria-label={`Move ${s.title} up`} disabled={busy !== null || i === 0} onClick={() => move(s, 'up')}><ArrowUp className="size-3.5" aria-hidden="true" /></button>
+                    <button type="button" className={cn(btnGhost, '!h-[1.1rem] !w-7 !px-0')} aria-label={`Move ${s.title} down`} disabled={busy !== null || i === list.length - 1} onClick={() => move(s, 'down')}><ArrowDown className="size-3.5" aria-hidden="true" /></button>
+                  </div>
+                ) : null}
                 <div className="w-36"><Select aria-label={`Status of ${s.title}`} value={s.status} disabled={busy === s.id} onChange={(v) => setStatus(s, v as StageStatus)} options={STAGE_STATUS.map((x) => ({ value: x, label: STAGE_LABEL[x] }))} /></div>
                 <button type="button" className={cn(btnGhost, '!h-9 !px-2.5')} aria-label={`Edit ${s.title}`} onClick={() => setEditing(s)}><Pencil className="size-3.5" aria-hidden="true" /></button>
               </div>
