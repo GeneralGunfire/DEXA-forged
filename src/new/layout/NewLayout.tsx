@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Home, LogOut, PanelLeft, X } from 'lucide-react'
+import { Home, LogOut, PanelLeft, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useRole } from '../../lib/data'
 import {
@@ -94,11 +94,6 @@ export default function NewLayout({ name }: { name: string }) {
 
           <AnimatedSidebarFooter className="gap-1 border-none p-3">
             <AnimatedSidebarMenu>
-              <AnimatedSidebarMenuItem>
-                <AnimatedSidebarMenuButton icon={<ArrowLeft className="size-4" />} onSelect={() => navigate('/app')}>
-                  Back to Old Forge
-                </AnimatedSidebarMenuButton>
-              </AnimatedSidebarMenuItem>
               <AnimatedSidebarMenuItem>
                 <AnimatedSidebarMenuButton icon={<LogOut className="size-4" />} onSelect={() => supabase.auth.signOut()}>
                   Sign out

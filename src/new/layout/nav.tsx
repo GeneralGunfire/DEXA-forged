@@ -6,7 +6,7 @@ import {
 export type NavLeaf = { label: string; to: string; icon: LucideIcon }
 export type NavGroup = { id: string; label: string; icon: LucideIcon; items: NavLeaf[] }
 
-export const GROUPS: NavGroup[] = [
+export const ALL_GROUPS: NavGroup[] = [
   {
     id: 'admin', label: 'Admin', icon: LayoutGrid,
     items: [
@@ -37,4 +37,8 @@ export const GROUPS: NavGroup[] = [
   },
 ]
 
-export const ALL_LEAVES = GROUPS.flatMap((g) => g.items)
+/** The Work group stays routed (as "Coming soon") but is not shown in the menu until its pages are built. */
+const HIDDEN_GROUPS = ['work']
+export const GROUPS: NavGroup[] = ALL_GROUPS.filter((g) => !HIDDEN_GROUPS.includes(g.id))
+
+export const ALL_LEAVES = ALL_GROUPS.flatMap((g) => g.items)
