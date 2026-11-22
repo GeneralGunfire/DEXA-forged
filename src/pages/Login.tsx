@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { setRemember, supabase } from '../lib/supabase'
 
+/** Remembers, for this tab only, that the person chose New Forge on the login page. */
+export const NEXT_KEY = 'forged_after_login'
+
 export default function Login() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
@@ -12,6 +17,12 @@ export default function Login() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (busy) return
+    // the secondary "New Forge" button submits the same form and asks to land on /new
+    const sub = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    try {
+      if (sub?.value === 'new') sessionStorage.setItem(NEXT_KEY, 'new')
+      else sessionStorage.removeItem(NEXT_KEY)
+    } catch { /* storage blocked */ }
     setNotice(null)
     setBusy(true)
     try {
@@ -27,7 +38,8 @@ export default function Login() {
               : 'Incorrect email or password.',
         )
       }
-      // On success App.tsx picks up the new session automatically.
+      // On success App.tsx picks up the new session automatically; New Forge also goes there directly.
+      else if (sub?.value === 'new') navigate('/new', { replace: true })
     } catch {
       setNotice('Could not reach the server. Check your connection and try again.')
     } finally {
@@ -106,6 +118,9 @@ export default function Login() {
 
             <button className="submit" type="submit" disabled={busy}>
               {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+            <button className="submit submit--alt" type="submit" value="new" disabled={busy}>
+              New Forge
             </button>
 
             <p className="notice" role="status" aria-live="polite">{notice}</p>

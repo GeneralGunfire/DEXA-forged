@@ -1,0 +1,114 @@
+/*
+  New Forge theme: shadcn "Modern Minimal" (dark). This is the only colour scheme used here.
+  Tailwind is loaded WITHOUT its global reset and scanning only src/new, so the old site is untouched.
+*/
+@layer theme, base, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+/* The New Forge root. Everything, including the mobile drawer, renders inside it. */
+.nf {
+  --background: #171717;
+  --foreground: #fafafa;
+  --card: #262626;
+  --card-foreground: #fafafa;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --muted: #1f1f1f;
+  --muted-foreground: #a3a3a3;
+  --accent: #1e3a8a;
+  --accent-foreground: #fafafa;
+  --destructive: #ef4444;
+  --border: #404040;
+  --input: #404040;
+  --ring: #3b82f6;
+  --radius: 0.375rem;
+
+  position: fixed; inset: 0; z-index: 0;
+  background: var(--background); color: var(--foreground);
+  font-family: var(--font); -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+@layer base {
+/* Minimal base, scoped to New Forge (the stand-in for Tailwind's reset, which we do not load). */
+.nf *, .nf *::before, .nf *::after { box-sizing: border-box; border: 0 solid var(--border); }
+.nf button, .nf a { font: inherit; color: inherit; background: none; text-decoration: none; cursor: pointer; }
+.nf button { padding: 0; }
+.nf ul, .nf ol { margin: 0; padding: 0; list-style: none; }
+.nf h1, .nf h2, .nf h3, .nf p { margin: 0; }
+.nf img { display: block; max-width: 100%; }
+.nf *:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+}
+
+/*
+  Scrollbars for all of New Forge: slim, rounded, dark, and blue when you point at them.
+  The old site sets scrollbar-width/color on every element, which makes Chromium ignore the styled bar,
+  so those two are reset to "auto" inside .nf. Firefox has no ::-webkit-scrollbar, so it gets the standard properties.
+*/
+.nf *, .nf { scrollbar-width: auto; scrollbar-color: auto; }
+.nf *::-webkit-scrollbar, .nf::-webkit-scrollbar { width: 12px; height: 12px; }
+.nf *::-webkit-scrollbar-track, .nf::-webkit-scrollbar-track { background: transparent; }
+.nf *::-webkit-scrollbar-corner, .nf::-webkit-scrollbar-corner { background: transparent; }
+.nf *::-webkit-scrollbar-thumb {
+  background-color: var(--border); background-clip: content-box;
+  border: 3px solid transparent; border-radius: 999px; min-height: 40px; min-width: 40px;
+}
+.nf *::-webkit-scrollbar-thumb:hover { background-color: var(--muted-foreground); }
+.nf *::-webkit-scrollbar-thumb:active { background-color: var(--primary); }
+@supports not selector(::-webkit-scrollbar) {
+  .nf *, .nf { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+}
+
+/* popups and floating panels: a short fade and rise (and none at all if the person asked for less motion) */
+@keyframes nf-pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes nf-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nf-rise { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+.nf .nf-pop { animation: nf-pop .12s ease-out; }
+.nf .nf-fade { animation: nf-fade .15s ease-out; }
+.nf .nf-rise { animation: nf-rise .18s cubic-bezier(.2,.7,.2,1); }
+@media (prefers-reduced-motion: reduce) { .nf .nf-pop, .nf .nf-fade, .nf .nf-rise { animation: none; } }
+
+/* the browser's own "x" and focus ring on search boxes would clash with ours */
+.nf input[type='search']::-webkit-search-cancel-button, .nf input[type='search']::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.nf input, .nf textarea, .nf select { color-scheme: dark; }
+
+
+/* printing a report: paper colours, no menu, no controls, the whole page flows across sheets */
+@media print {
+  @page { margin: 14mm; }
+  .nf { --background: #ffffff; --foreground: #111111; --card: #ffffff; --card-foreground: #111111; --secondary: #f3f4f6; --muted: #f3f4f6; --muted-foreground: #4b5563; --border: #d1d5db; --input: #d1d5db; --destructive: #b91c1c; --primary: #1d4ed8; }
+  html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
+  .nf { position: static !important; inset: auto !important; }
+  .nf, .nf [data-slot='sidebar-wrapper'], .nf [data-slot='sidebar-inset'] { display: block !important; height: auto !important; min-height: 0 !important; overflow: visible !important; background: #fff !important; color: #111 !important; }
+  .nf [data-slot='sidebar'], .nf [data-slot='sidebar-inset'] > header, .nf .nf-noprint { display: none !important; }
+  .nf .nf-printblock { break-inside: avoid; page-break-inside: avoid; }
+  .nf .nf-printpage { max-width: none !important; padding: 0 !important; }
+}
