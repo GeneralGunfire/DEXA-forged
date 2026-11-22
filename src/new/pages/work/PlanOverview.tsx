@@ -57,7 +57,35 @@ export default function PlanOverview() {
           : rows.length === 0 ? <p className="rounded-xl border border-dashed border-border px-6 py-14 text-center text-sm text-muted-foreground">No databases yet. Add them under Documentation first.</p>
           : (
             <>
-              <section aria-label="Databases" className="border-t border-border pt-5">
+              <section aria-label="Build order" className="border-t border-border pt-5">
+                <h2 className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Build order</h2>
+                <p className="mt-1.5 max-w-[72ch] text-sm text-muted-foreground">
+                  {hasLinks ? 'Built from the “build after” links. Everything in a step can start once the step before it is done.' : 'No “build after” links are recorded yet, so every database can start now.'}
+                </p>
+                <ol className="mt-4 space-y-3">
+                  {order.levels.map((lvl, i) => (
+                    <li key={i} className="grid gap-3 sm:grid-cols-[6rem_1fr]">
+                      <span className="pt-1 text-xs font-medium text-muted-foreground">{i === 0 ? 'Start now' : `Then, step ${i + 1}`}</span>
+                      <span className="flex flex-wrap gap-2">
+                        {lvl.map((id) => <Link key={id} to={`/new/work/plan/${id}`} className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted">{name(id)}</Link>)}
+                      </span>
+                    </li>
+                  ))}
+                  {order.circular.length ? (
+                    <li className="grid gap-3 sm:grid-cols-[6rem_1fr]">
+                      <span className="pt-1 text-xs font-medium text-destructive">Circular</span>
+                      <span>
+                        <span className="flex flex-wrap gap-2">
+                          {order.circular.map((id) => <Link key={id} to={`/new/work/plan/${id}`} className="rounded-full border border-destructive/50 px-3 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10">{name(id)}</Link>)}
+                        </span>
+                        <span className="mt-2 block text-xs text-muted-foreground">These wait on each other (or on something that does), so no order can be worked out. Change one of their dependencies.</span>
+                      </span>
+                    </li>
+                  ) : null}
+                </ol>
+              </section>
+
+              <section aria-label="Databases" className="mt-12 border-t border-border pt-5">
                 <div className={cn('hidden gap-4 px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground md:grid', COLS)} aria-hidden="true">
                   <span>Database</span><span>Progress</span><span>Next stage</span><span className="text-right">Blocked</span>
                 </div>
@@ -85,34 +113,6 @@ export default function PlanOverview() {
                     </li>
                   ))}
                 </ul>
-              </section>
-
-              <section aria-label="Build order" className="mt-12 border-t border-border pt-5">
-                <h2 className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Build order</h2>
-                <p className="mt-1.5 max-w-[72ch] text-sm text-muted-foreground">
-                  {hasLinks ? 'Built from the “build after” links. Everything in a step can start once the step before it is done.' : 'No “build after” links are recorded yet, so every database can start now.'}
-                </p>
-                <ol className="mt-4 space-y-3">
-                  {order.levels.map((lvl, i) => (
-                    <li key={i} className="grid gap-3 sm:grid-cols-[6rem_1fr]">
-                      <span className="pt-1 text-xs font-medium text-muted-foreground">{i === 0 ? 'Start now' : `Then, step ${i + 1}`}</span>
-                      <span className="flex flex-wrap gap-2">
-                        {lvl.map((id) => <Link key={id} to={`/new/work/plan/${id}`} className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted">{name(id)}</Link>)}
-                      </span>
-                    </li>
-                  ))}
-                  {order.circular.length ? (
-                    <li className="grid gap-3 sm:grid-cols-[6rem_1fr]">
-                      <span className="pt-1 text-xs font-medium text-destructive">Circular</span>
-                      <span>
-                        <span className="flex flex-wrap gap-2">
-                          {order.circular.map((id) => <Link key={id} to={`/new/work/plan/${id}`} className="rounded-full border border-destructive/50 px-3 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10">{name(id)}</Link>)}
-                        </span>
-                        <span className="mt-2 block text-xs text-muted-foreground">These wait on each other (or on something that does), so no order can be worked out. Change one of their dependencies.</span>
-                      </span>
-                    </li>
-                  ) : null}
-                </ol>
               </section>
             </>
           )}
