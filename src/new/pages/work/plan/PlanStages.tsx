@@ -10,7 +10,6 @@ import { Empty, FormDialog, Part } from '../FormDialog'
 import { saveError, STAGE_LABEL, STAGE_STATUS, type Stage, type StageStatus } from '../shared'
 
 const DOT: Record<StageStatus, string> = { planned: 'bg-muted-foreground/60', in_progress: 'bg-primary', done: 'bg-primary/50', blocked: 'bg-destructive', dropped: 'bg-border' }
-const stamp = (s: StageStatus) => ({ status: s, completed_at: s === 'done' ? new Date().toISOString() : null })
 
 export function PlanStages({ dbId, stages, reload }: { dbId: string; stages: Stage[]; reload: () => void }) {
   const [editing, setEditing] = useState<Stage | 'new' | null>(null)
@@ -21,14 +20,14 @@ export function PlanStages({ dbId, stages, reload }: { dbId: string; stages: Sta
   async function setStatus(s: Stage, status: StageStatus) {
     if (busy || status === s.status) return
     setBusy(s.id); setMsg(null)
-    try { unwrap(await supabase.from('gw_plan_stages').update(stamp(status)).eq('id', s.id)); reload() }
+    try { unwrap(await supabase.from('gw_plan_stages').update({ status }).eq('id', s.id)); reload() }
     catch (e) { setMsg({ id: s.id, text: saveError(e) }) }
     finally { setBusy(null) }
   }
 
   return (
     <Part
-      id="stages" title="Build stages" count={list.length} hint="The steps to build this gateway, in order. Marking a stage done records when."
+      id="stages" title="Build stages" count={list.length} hint="The steps to build this gateway, in order. The database records when a stage is marked done."
       action={<button type="button" className={btn} onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden="true" /> Add stage</button>}
     >
       {list.length === 0 ? <Empty>No stages planned yet.</Empty> : (
@@ -73,8 +72,8 @@ function StageForm({ dbId, stage, next, onClose, onDone }: { dbId: string; stage
       onSave={async () => {
         if (!title.trim()) throw new Error('Give the stage a title.')
         const row = { title: title.trim(), goal: goal.trim(), done_when: doneWhen.trim(), notes: notes.trim() }
-        if (stage) unwrap(await supabase.from('gw_plan_stages').update({ ...row, ...(status !== stage.status ? stamp(status) : {}) }).eq('id', stage.id))
-        else unwrap(await supabase.from('gw_plan_stages').insert({ ...row, ...stamp(status), database_id: dbId, position: next }))
+        if (stage) unwrap(await supabase.from('gw_plan_stages').update({ ...row, ...(status !== stage.status ? { status } : {}) }).eq('id', stage.id))
+        else unwrap(await supabase.from('gw_plan_stages').insert({ ...row, status, database_id: dbId, position: next }))
         onDone()
       }}
     >

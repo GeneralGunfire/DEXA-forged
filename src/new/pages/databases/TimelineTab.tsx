@@ -46,9 +46,15 @@ const TypeChip = ({ type, className }: { type: string; className?: string }) => 
   </span>
 )
 
-export function TimelineTab({ db }: { db: Db }) {
+/** `onlyPhase` limits the tab to one phase (the Work > Progress page passes '2'); `onLoaded` hands the loaded entries to the page. */
+export function TimelineTab({ db, onlyPhase, onLoaded }: { db: Db; onlyPhase?: string; onLoaded?: (entries: Entry[]) => void }) {
   const me = useMe()
-  const entries = useLoad<Entry[]>(async () => unwrap<Entry[]>(await supabase.from('timeline_entries').select('*').eq('database_id', db.id).order('happened_at', { ascending: false }).limit(2000)) ?? [], [db.id])
+  const entries = useLoad<Entry[]>(async () => {
+    let q = supabase.from('timeline_entries').select('*').eq('database_id', db.id)
+    if (onlyPhase) q = q.eq('phase', onlyPhase)
+    return unwrap<Entry[]>(await q.order('happened_at', { ascending: false }).limit(2000)) ?? []
+  }, [db.id, onlyPhase])
+  useEffect(() => { if (entries.data) onLoaded?.(entries.data) }, [entries.data]) // eslint-disable-line react-hooks/exhaustive-deps
   const docs = useLoad<DocLink[]>(async () => {
     const r = await supabase.from('db_documents').select('id, name, entry_id').eq('database_id', db.id).eq('is_current', true).not('entry_id', 'is', null)
     return r.error ? [] : ((r.data ?? []) as DocLink[])
@@ -142,10 +148,10 @@ export function TimelineTab({ db }: { db: Db }) {
           {q ? <button type="button" aria-label="Clear the search" onClick={() => setQ('')} className="absolute right-1.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground"><X className="size-3.5" aria-hidden="true" /></button> : null}
         </div>
         <div className="w-40"><Select aria-label="Who logged it" value={author} onChange={setAuthor} options={[{ value: '', label: 'Everyone' }, { value: 'Claude Code', label: 'Claude Code' }, { value: 'team', label: 'The team' }]} /></div>
-        <div className="w-44"><Select aria-label="Phase" value={phase} onChange={setPhase} options={[{ value: '', label: 'All phases' }, { value: '1', label: 'Phase 1' }, { value: '1-2', label: 'Phases 1-2' }, { value: '2', label: 'Phase 2' }, { value: 'Other', label: 'Other' }]} /></div>
+        {onlyPhase ? null : <div className="w-44"><Select aria-label="Phase" value={phase} onChange={setPhase} options={[{ value: '', label: 'All phases' }, { value: '1', label: 'Phase 1' }, { value: '1-2', label: 'Phases 1-2' }, { value: '2', label: 'Phase 2' }, { value: 'Other', label: 'Other' }]} /></div>}
         <div className="ml-auto flex gap-2">
           <button type="button" className={btn} onClick={reload} disabled={entries.loading}><RefreshCw className={cn('size-4', entries.loading && 'animate-spin')} aria-hidden="true" /> Refresh</button>
-          <button type="button" className={btnPrimary} onClick={() => setEditing({})}><Plus className="size-4" aria-hidden="true" /> Add entry</button>
+          <button type="button" className={btnPrimary} onClick={() => setEditing(onlyPhase ? { preset: { phase: onlyPhase } } : {})}><Plus className="size-4" aria-hidden="true" /> Add entry</button>
         </div>
       </div>
 
@@ -167,7 +173,7 @@ export function TimelineTab({ db }: { db: Db }) {
             <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
               <p className="text-lg font-medium">Nothing has been logged for this database yet.</p>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">Claude Code adds entries here as it works. You can also add one by hand.</p>
-              <button type="button" className={cn(btnPrimary, 'mt-6')} onClick={() => setEditing({})}><Plus className="size-4" aria-hidden="true" /> Add entry</button>
+              <button type="button" className={cn(btnPrimary, 'mt-6')} onClick={() => setEditing(onlyPhase ? { preset: { phase: onlyPhase } } : {})}><Plus className="size-4" aria-hidden="true" /> Add entry</button>
             </div>
           ) : nodes.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-sm text-muted-foreground">No entries match these filters. <button type="button" className="text-primary hover:underline" onClick={clear}>Clear them</button></p>

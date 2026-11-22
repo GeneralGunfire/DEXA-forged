@@ -9,7 +9,7 @@ export type Status = 'scheduled' | 'ran' | 'done' | 'reviewed' | 'cancelled'
 export type Ev = {
   id: string; kind: 'event' | 'prompt'; category: string | null; title: string; notes: string
   starts_at: string; ends_at: string | null; all_day: boolean; assignee: string | null
-  status: Status; database_id: string | null; cancelled_at: string | null
+  status: Status; database_id: string | null; cancelled_at: string | null; workstream?: 'general' | 'gateway'
 }
 export type Prompt = {
   id: string; event_id: string; tag: string; prompt_text: string; paste_back: string

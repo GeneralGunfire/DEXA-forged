@@ -24,6 +24,14 @@ export function TagPill({ tag, className }: { tag: string; className?: string })
   return <span className={cn('shrink-0 rounded border border-border bg-background/60 px-1.5 text-[10px] font-medium leading-[16px] tabular-nums text-muted-foreground', className)}>{tag}</span>
 }
 
+/** Marks a prompt that belongs to the gateway work, so it stands out in the calendar. */
+export function GatewayPill({ ev, className, compact = false }: { ev: Ev; className?: string; compact?: boolean }) {
+  if (ev.kind !== 'prompt' || ev.workstream !== 'gateway') return null
+  // month cells are too narrow for the word without hiding the title, so they show a small marker with the same meaning
+  if (compact) return <span role="img" aria-label="Gateway prompt" title="Gateway prompt" className={cn('size-2 shrink-0 rounded-full border border-primary bg-primary/40', className)} />
+  return <span className={cn('shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 text-[10px] font-medium leading-[16px] text-foreground', className)}>Gateway</span>
+}
+
 const range = (e: Ev) => (e.all_day ? 'All day' : e.ends_at ? `${timeLabel(e.starts_at)} – ${timeLabel(e.ends_at)}` : timeLabel(e.starts_at))
 
 /**
@@ -45,6 +53,7 @@ function Chip({ ev, tags, now, onOpen, block = false, h = 0, showTime = true, sh
         {showTime && !ev.all_day ? <span className="shrink-0 tabular-nums text-muted-foreground">{timeLabel(ev.starts_at)}</span> : null}
         <span className="min-w-0 flex-1 truncate font-medium">{ev.title}</span>
         {tag && showTag ? <TagPill tag={tag} /> : null}
+        <GatewayPill ev={ev} compact={!showTag} />
       </button>
     )
   }
@@ -58,6 +67,7 @@ function Chip({ ev, tags, now, onOpen, block = false, h = 0, showTime = true, sh
         <span className="min-w-0 truncate tabular-nums">{range(ev)}</span>
         {late ? <span className="shrink-0 font-medium text-destructive">Overdue</span> : null}
         {tag ? <TagPill tag={tag} className="ml-auto" /> : null}
+        <GatewayPill ev={ev} className={tag ? '' : 'ml-auto'} />
       </span> : null}
     </button>
   )
@@ -271,6 +281,7 @@ function Row({ ev, tags, now, onOpen, when }: { ev: Ev; when: string } & Omit<Co
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
           {tags[ev.id] ? <TagPill tag={tags[ev.id]} /> : null}
+          <GatewayPill ev={ev} />
           {overdue ? <Pill tone="bad">Overdue</Pill> : ev.status !== 'scheduled' ? <Pill tone={ev.status === 'ran' ? 'blue' : 'plain'}>{STATUS_LABEL[ev.status]}</Pill> : null}
         </span>
       </button>

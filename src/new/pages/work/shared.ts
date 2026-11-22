@@ -75,9 +75,9 @@ export function buildOrder(ids: string[], deps: Dep[]) {
 /** What a person should read when a save is refused. The typed text is never cleared. */
 export function saveError(e: unknown): string {
   const x = e as { message?: string; code?: string } | null
-  const m = (x?.message ?? '').trim().replace(/[.]+$/, '')
+  const m = (x?.message ?? '').trim()
   if (x?.code === '42501' || /failed to fetch|network|not a team member|row-level security/i.test(m)) return plainError(e)
-  return `The database did not accept this, so nothing was saved. It said: “${m || 'no reason given'}”. Text that looks like patient data, an email, a phone number, an ID or card number, a connection string, or a secret is refused. Reword it with counts and plain descriptions only. What you typed is still here.`
+  return `Not saved. ${m || 'The database gave no reason.'} What you typed is still here.`
 }
 
 export const pct = (done: number, total: number) => (total === 0 ? 0 : Math.round((done / total) * 100))
