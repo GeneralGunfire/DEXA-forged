@@ -1,6 +1,6 @@
 import {
   Bell, BookOpen, Briefcase, CalendarDays, Database, FileText, FolderOpen, Globe2, Image, LayoutGrid,
-  ListChecks, MessageSquareHeart, Settings, Sparkles, TriangleAlert, Waypoints, type LucideIcon,
+  ListChecks, MessageSquareHeart, Settings, Sparkles, Waypoints, type LucideIcon,
 } from 'lucide-react'
 
 export type NavLeaf = { label: string; to: string; icon: LucideIcon }
@@ -29,10 +29,9 @@ export const ALL_GROUPS: NavGroup[] = [
   {
     id: 'work', label: 'Work', icon: Briefcase,
     items: [
-      { label: 'Tracker', to: '/new/work/tracker', icon: ListChecks },
-      { label: 'Prompts', to: '/new/work/prompts', icon: Sparkles },
-      { label: 'Timeline', to: '/new/work/timeline', icon: Waypoints },
-      { label: 'Errors', to: '/new/work/errors', icon: TriangleAlert },
+      { label: 'Plan', to: '/new/work/plan', icon: ListChecks },
+      { label: 'Progress', to: '/new/work/progress', icon: Waypoints },
+      { label: 'Query', to: '/new/work/query', icon: Sparkles },
     ],
   },
 ]
