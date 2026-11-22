@@ -100,6 +100,18 @@
 .nf input[type='search']::-webkit-search-cancel-button, .nf input[type='search']::-webkit-search-decoration { -webkit-appearance: none; display: none; }
 .nf input, .nf textarea, .nf select { color-scheme: dark; }
 
+/* Sign-in fields: when the browser fills them in (or offers to), it paints a blue box. Keep the box grey with light text. */
+.nf .lg-field:-webkit-autofill,
+.nf .lg-field:-webkit-autofill:hover,
+.nf .lg-field:-webkit-autofill:focus,
+.nf .lg-field:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+  box-shadow: 0 0 0 1000px var(--secondary) inset !important;
+  transition: background-color 600000s ease-in-out 0s;
+}
+.nf .lg-field:autofill { -webkit-text-fill-color: var(--foreground); box-shadow: 0 0 0 1000px var(--secondary) inset !important; }
+
 
 /* printing a report: paper colours, no menu, no controls, the whole page flows across sheets */
 @media print {
