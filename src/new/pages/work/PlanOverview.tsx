@@ -37,7 +37,10 @@ export default function PlanOverview() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Plan</h1>
           <p className="mt-2 text-sm text-muted-foreground">How the gateway will be built for each database: the route in, the field mapping, the stages and what is blocking them.</p>
         </div>
-        <button type="button" className={btn} onClick={reload} disabled={loading}><RefreshCw className={cn('size-4', loading && 'animate-spin')} aria-hidden="true" /> Refresh</button>
+        <div className="flex gap-2">
+          <Link to="/new/work/estate" className={btn}>Estate research and requirements</Link>
+          <button type="button" className={btn} onClick={reload} disabled={loading}><RefreshCw className={cn('size-4', loading && 'animate-spin')} aria-hidden="true" /> Refresh</button>
+        </div>
       </header>
 
       {data ? (

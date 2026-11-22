@@ -21,7 +21,8 @@ const PlanOverview = lazy(() => import('./pages/work/PlanOverview'))
 const PlanDb = lazy(() => import('./pages/work/PlanDb'))
 const ProgressOverview = lazy(() => import('./pages/work/ProgressOverview'))
 const ProgressDb = lazy(() => import('./pages/work/ProgressDb'))
-const BUILT = ['/new/work/plan', '/new/work/progress', '/new/documentation/documents', '/new/documentation/reports', '/new/documentation/estate-overview', '/new/documentation/databases', '/new/admin/calendar', '/new/admin/announcements', '/new/admin/branding', '/new/admin/feedback', '/new/admin/settings']
+const EstateOverview = lazy(() => import('./pages/work/EstateOverview'))
+const BUILT = ['/new/work/plan', '/new/work/progress', '/new/work/estate', '/new/documentation/documents', '/new/documentation/reports', '/new/documentation/estate-overview', '/new/documentation/databases', '/new/admin/calendar', '/new/admin/announcements', '/new/admin/branding', '/new/admin/feedback', '/new/admin/settings']
 
 export default function NewForge({ session }: { session: Session }) {
   const email = session.user.email ?? ''
@@ -44,6 +45,7 @@ export default function NewForge({ session }: { session: Session }) {
         <Route path="work/plan" element={<Suspense fallback={null}><PlanOverview /></Suspense>} />
         <Route path="work/progress" element={<Suspense fallback={null}><ProgressOverview /></Suspense>} />
         <Route path="work/progress/:id" element={<Suspense fallback={null}><ProgressDb /></Suspense>} />
+        <Route path="work/estate" element={<Suspense fallback={null}><EstateOverview /></Suspense>} />
         <Route path="work/plan/:id" element={<Suspense fallback={null}><PlanDb /></Suspense>} />
         {ALL_LEAVES.filter((l) => !BUILT.includes(l.to)).map((l) => (
           <Route key={l.to} path={l.to.replace('/new/', '')} element={<ComingSoon />} />
