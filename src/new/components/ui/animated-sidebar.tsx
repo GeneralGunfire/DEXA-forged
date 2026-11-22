@@ -3,11 +3,9 @@
 
 import { ChevronRight } from "lucide-react";
 import {
-  AnimatePresence,
   type HTMLMotionProps,
   motion,
   useReducedMotion,
-  type Variants,
 } from "motion/react";
 import {
   type ButtonHTMLAttributes,
@@ -29,7 +27,6 @@ import { SharedLayoutBg } from "@/components/ui/animated-sidebar-utils/shared-la
 import {
   EASE_DRAWER,
   EASE_OUT,
-  SPRING_LAYOUT,
   SPRING_PRESS,
 } from "@/components/ui/animated-sidebar-utils/ease";
 import { cn } from "@/lib/utils";
@@ -67,48 +64,6 @@ const LABEL_EXIT_TRANSITION = {
   duration: 0.12,
   ease: EASE_OUT,
 } as const;
-
-const SUBMENU_TRANSITION = {
-  duration: 0.18,
-  ease: EASE_OUT,
-} as const;
-
-const SUBMENU_VARIANTS: Variants = {
-  closed: {
-    opacity: 0,
-    clipPath: "inset(0 0 100% 0 round 8px)",
-    transition: {
-      duration: 0.14,
-      ease: EASE_OUT,
-      staggerChildren: 0.025,
-      staggerDirection: -1,
-    },
-  },
-  open: {
-    opacity: 1,
-    clipPath: "inset(0 0 0% 0 round 8px)",
-    transition: {
-      duration: 0.2,
-      delayChildren: 0.035,
-      ease: EASE_OUT,
-      staggerChildren: 0.045,
-    },
-  },
-};
-
-const SUBMENU_ITEM_VARIANTS: Variants = {
-  closed: {
-    opacity: 0,
-    y: -6,
-    filter: "blur(3px)",
-  },
-  open: {
-    opacity: 1,
-    y: 0,
-    filter: "blur(0px)",
-    transition: SUBMENU_TRANSITION,
-  },
-};
 
 const REDUCED_TRANSITION = {
   duration: 0.16,
@@ -834,8 +789,6 @@ export const AnimatedSidebarMenuItem = forwardRef<
     <motion.li
       {...props}
       ref={forwardedRef}
-      layout="position"
-      transition={SPRING_LAYOUT}
       data-slot="sidebar-menu-item"
       className={cn("relative", className)}
     />
@@ -843,13 +796,16 @@ export const AnimatedSidebarMenuItem = forwardRef<
 });
 
 export interface AnimatedSidebarMenuSubProps extends Omit<
-  HTMLMotionProps<"ul">,
+  HTMLAttributes<HTMLUListElement>,
   "children"
 > {
   open: boolean;
   children?: ReactNode;
 }
 
+// A group opens and closes with one CSS transition on the row height (0fr to 1fr) and a fade, 150 ms, with no
+// script measuring anything and no per-item animation. The list stays mounted so there is no exit to wait for;
+// while closed it is inert so keyboard and screen readers skip it. Reduced motion turns the transition off.
 export const AnimatedSidebarMenuSub = forwardRef<
   HTMLUListElement,
   AnimatedSidebarMenuSubProps
@@ -857,21 +813,24 @@ export const AnimatedSidebarMenuSub = forwardRef<
   { open, children, className, ...props },
   forwardedRef,
 ) {
-  const context = useAnimatedSidebar();
   const panel = useAnimatedSidebarPanel();
+  const shown = open && !panel.collapsed;
 
   return (
-    <AnimatePresence initial={false} mode="popLayout">
-      {open && !panel.collapsed ? (
-        <motion.ul
+    <div
+      data-slot="sidebar-menu-sub-wrap"
+      data-open={shown}
+      aria-hidden={!shown}
+      {...(shown ? {} : { inert: "" })}
+      className={cn(
+        "grid transition-[grid-template-rows,opacity] duration-[120ms] ease-out motion-reduce:transition-none",
+        shown ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+      )}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <ul
           {...props}
           ref={forwardedRef}
-          key="sidebar-submenu"
-          variants={context.reduce ? undefined : SUBMENU_VARIANTS}
-          initial={context.reduce ? false : "closed"}
-          animate={context.reduce ? { opacity: 1 } : "open"}
-          exit={context.reduce ? { opacity: 0 } : "closed"}
-          transition={context.reduce ? { duration: 0.12 } : undefined}
           data-slot="sidebar-menu-sub"
           className={cn(
             "relative mt-1 ml-5 flex min-w-0 flex-col gap-0.5 border-border border-l pl-3",
@@ -879,9 +838,9 @@ export const AnimatedSidebarMenuSub = forwardRef<
           )}
         >
           {children}
-        </motion.ul>
-      ) : null}
-    </AnimatePresence>
+        </ul>
+      </div>
+    </div>
   );
 });
 
@@ -893,7 +852,6 @@ export const AnimatedSidebarMenuSubItem = forwardRef<
     <motion.li
       {...props}
       ref={forwardedRef}
-      variants={SUBMENU_ITEM_VARIANTS}
       data-slot="sidebar-menu-sub-item"
       className={cn("relative min-w-0", className)}
     />
@@ -1046,11 +1004,7 @@ export function AnimatedSidebarMenuButton({
   const content = (
     <>
       {isActive ? (
-        <motion.span
-          layoutId={context.layoutId}
-          transition={context.reduce ? { duration: 0 } : SPRING_LAYOUT}
-          className="absolute inset-0 rounded-xl bg-muted"
-        />
+        <span aria-hidden="true" className="absolute inset-0 rounded-xl bg-muted" />
       ) : null}
       {icon ? (
         <span
@@ -1095,7 +1049,7 @@ export function AnimatedSidebarMenuButton({
             rotate: ariaExpanded ? 90 : 0,
             x: panel.collapsed ? 4 : 0,
           }}
-          transition={context.reduce ? { duration: 0 } : SPRING_LAYOUT}
+          transition={context.reduce ? { duration: 0 } : { duration: 0.15, ease: EASE_OUT }}
           className="relative z-10 grid size-4 shrink-0 place-items-center text-muted-foreground"
         >
           <ChevronRight className="size-3.5" />
