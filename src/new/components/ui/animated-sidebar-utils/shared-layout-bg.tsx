@@ -5,6 +5,7 @@ import {
   createElement,
   forwardRef,
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ElementType,
@@ -34,12 +35,25 @@ export const SharedLayoutBg = forwardRef<HTMLElement, SharedLayoutBgProps>(funct
 ) {
   const reduce = useReducedMotion() ?? false
   const listRef = useRef<HTMLElement | null>(null)
-  const [pill, setPill] = useState<{ y: number } | null>(null)
+  const [pill, setPill] = useState<{ y: number; follow?: boolean } | null>(null)
+  const hovered = useRef<HTMLElement | null>(null)
 
   const track = useCallback((target: EventTarget | null) => {
     const item = (target as HTMLElement | null)?.closest<HTMLElement>('[data-slot="sidebar-menu-item"]')
     if (!item || !listRef.current?.contains(item)) return
+    hovered.current = item
     setPill({ y: item.offsetTop })
+  }, [])
+
+  // A group opening or closing moves the rows under the pointer. Keep the highlight on its row by following the
+  // list's size, with no spring, so it never lags behind or jumps.
+  useEffect(() => {
+    const list = listRef.current
+    if (!list || typeof ResizeObserver === 'undefined') return
+    const watch = new ResizeObserver(() => { const el = hovered.current; if (el) setPill((cur) => (cur ? { y: el.offsetTop, follow: true } : cur)) })
+    watch.observe(list)
+    for (const sub of list.querySelectorAll('[data-slot="sidebar-menu-sub-wrap"]')) watch.observe(sub)
+    return () => watch.disconnect()
   }, [])
 
   return createElement(
@@ -54,7 +68,7 @@ export const SharedLayoutBg = forwardRef<HTMLElement, SharedLayoutBgProps>(funct
       className: cn('relative', className),
       onPointerOver: (e: React.PointerEvent<HTMLElement>) => track(e.target),
       onFocus: (e: React.FocusEvent<HTMLElement>) => track(e.target),
-      onPointerLeave: (e: React.PointerEvent<HTMLElement>) => { setPill(null); onPointerLeave?.(e) },
+      onPointerLeave: (e: React.PointerEvent<HTMLElement>) => { hovered.current = null; setPill(null); onPointerLeave?.(e) },
       onBlur: (e: React.FocusEvent<HTMLElement>) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPill(null)
         onBlur?.(e)
@@ -68,7 +82,7 @@ export const SharedLayoutBg = forwardRef<HTMLElement, SharedLayoutBgProps>(funct
       <motion.span
         initial={false}
         animate={{ y: pill?.y ?? 0, opacity: pill ? 1 : 0 }}
-        transition={reduce ? { duration: 0 } : SPRING_LAYOUT}
+        transition={reduce || pill?.follow ? { duration: 0 } : SPRING_LAYOUT}
         className={cn('absolute inset-0', pillClassName)}
       />
     </span>,
