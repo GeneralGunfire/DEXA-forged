@@ -195,8 +195,8 @@ export default function Home({ name }: { name: string }) {
 
       <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-border pt-5 sm:grid-cols-3 lg:grid-cols-6">
         <Stat k="Databases" value={total} to="/new/documentation/databases" note={groups[0] ? `${groups[0][1]} ${groups[0][0].toLowerCase()}` : undefined} />
-        <Stat k="Open errors" value={data?.errors.length ?? 0} bad to="/new/work/errors" note={data?.errors.length ? 'need attention' : 'all clear'} />
-        <Stat k="This week" value={act.thisWeek} to="/new/work/timeline" note="timeline entries" />
+        <Stat k="Open errors" value={data?.errors.length ?? 0} bad to="/new/documentation/estate-overview" note={data?.errors.length ? 'need attention' : 'all clear'} />
+        <Stat k="This week" value={act.thisWeek} to="/new/documentation/reports" note="timeline entries" />
         <Stat k="Prompts running" value={data?.running.length ?? 0} to="/new/admin/calendar" note="awaiting a response" />
         <Stat k="Overdue" value={data?.overdue.length ?? 0} bad to="/new/admin/calendar" note="prompts past due" />
         <Stat k="New feedback" value={data?.fb.length ?? 0} to="/new/admin/feedback" note="not yet read" />
@@ -207,7 +207,7 @@ export default function Home({ name }: { name: string }) {
       ) : (
         <div className="mt-8 grid gap-x-10 gap-y-8 lg:grid-cols-12">
           {/* row 1: activity */}
-          <Mod title="Activity, last 12 weeks" link="Timeline" to="/new/work/timeline" span="lg:col-span-6">
+          <Mod title="Activity, last 12 weeks" link="Reports" to="/new/documentation/reports" span="lg:col-span-6">
             <p className="flex flex-wrap items-baseline gap-x-2.5">
               <span className="text-2xl font-semibold tabular-nums tracking-tight">{loading ? '–' : headline}</span>
               <span className="text-xs text-muted-foreground">entries this week{!loading && delta !== 0 ? ` · ${delta > 0 ? '+' : ''}${delta} on last week` : ''}</span>
@@ -262,7 +262,7 @@ export default function Home({ name }: { name: string }) {
           </Mod>
 
           {/* row 2: what happened */}
-          <Mod title="Latest activity" link="Open the timeline" to="/new/work/timeline" span="lg:col-span-6">
+          <Mod title="Latest activity" link="Open reports" to="/new/documentation/reports" span="lg:col-span-6">
             {loading ? <Loading /> : data!.latest.length === 0 ? <p className="text-xs text-muted-foreground">Nothing has been logged yet.</p> : (
               <ol className="divide-y divide-border">
                 {data!.latest.map((e) => (
@@ -305,7 +305,7 @@ export default function Home({ name }: { name: string }) {
             )}
           </Mod>
 
-          <Mod title="Open errors" link="All errors" to="/new/work/errors" span="lg:col-span-3">
+          <Mod title="Open errors" link="Estate overview" to="/new/documentation/estate-overview" span="lg:col-span-3">
             {loading ? <Loading /> : data!.errors.length === 0 ? <p className="text-xs text-muted-foreground">No open errors.</p> : (
               <ul className="divide-y divide-border">
                 {data!.errors.slice(0, 3).map((e) => (
