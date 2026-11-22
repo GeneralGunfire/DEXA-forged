@@ -161,3 +161,74 @@ export function parseSourceLine(line: string): SourcePart[] {
 export function parseSources(text: string): SourcePart[][] {
   return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map(parseSourceLine)
 }
+
+/** Like parseSources, but a trailing note in brackets, such as "(search snippet only)", is split off so it can be shown as a small label. */
+export type SourceItem = { parts: SourcePart[]; note: string | null }
+export function parseSourceItems(text: string): SourceItem[] {
+  return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((line) => {
+    const m = /\s+\(([^()\n]{1,120})\)\s*$/.exec(line)
+    if (m && !/https?:/i.test(m[1])) return { parts: parseSourceLine(line.slice(0, m.index).trim()), note: m[1].trim() }
+    return { parts: parseSourceLine(line), note: null }
+  })
+}
+
+/* ---------------- section text: a light format, split into labelled blocks ---------------- */
+
+export type BlockKind = 'lead' | 'facts' | 'dexa' | 'unknown' | 'other' | 'plain'
+export type BodyBlock = { label: string | null; kind: BlockKind; text: string }
+
+const LABEL_LINE = /^\s*\*\*([^*\n]+?)\*\*\s*:?\s*$/
+
+function kindOf(label: string): BlockKind {
+  const l = label.toLowerCase().replace(/[:.\s]+$/, '').trim()
+  if (l === 'in plain words') return 'lead'
+  if (l === 'key facts') return 'facts'
+  if (l.startsWith('what it means')) return 'dexa'
+  if (l === 'not established') return 'unknown'
+  return 'other'
+}
+
+/**
+ * Splits a section body into blocks. A line that is only a bold label (like **Key facts**) starts a block; the lines
+ * under it belong to that block. Text before the first label is an unlabelled "plain" block. The in-line formatting
+ * (bold, bullets, paragraphs) inside a block is left for the safe Rich renderer; nothing here produces HTML.
+ */
+export function parseBody(body: string): BodyBlock[] {
+  const blocks: BodyBlock[] = []
+  let label: string | null = null
+  let lines: string[] = []
+  const flush = () => {
+    const text = lines.join('\n').trim()
+    if (label !== null) blocks.push({ label, kind: kindOf(label), text })
+    else if (text) blocks.push({ label: null, kind: 'plain', text })
+  }
+  for (const line of body.replace(/\r/g, '').split('\n')) {
+    const m = LABEL_LINE.exec(line)
+    if (m) { flush(); label = m[1].trim().replace(/:$/, ''); lines = [] } else lines.push(line)
+  }
+  flush()
+  return blocks
+}
+
+/** The same blocks with "In plain words" first (a lead paragraph at the top); everything else keeps its order. */
+export const leadFirst = (blocks: BodyBlock[]): BodyBlock[] => [...blocks.filter((b) => b.kind === 'lead'), ...blocks.filter((b) => b.kind !== 'lead')]
+
+/** Text with the light formatting removed (bold, italic, links, bullet dashes), on one line. */
+export function plainText(md: string): string {
+  return md
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '$1')
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/^\s*-\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** The card preview: the "In plain words" text if there is one, else the first block with text (never the "Not established" one first). */
+export function previewText(body: string, max = 240): string {
+  const blocks = parseBody(body)
+  const pick = blocks.find((b) => b.kind === 'lead' && b.text) ?? blocks.find((b) => b.text && b.kind !== 'unknown') ?? blocks.find((b) => b.text)
+  if (!pick) return ''
+  const t = plainText(pick.text)
+  return t.length > max ? t.slice(0, max).replace(/\s+\S*$/, '') + '…' : t
+}

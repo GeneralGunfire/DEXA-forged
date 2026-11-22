@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   filterRequirements, filterSections, groupByArea, NO_DB, NO_REQ_FILTERS, parseSourceLine, parseSources, requirementStats, safeHttpUrl,
-  sectionCounts, topicStats, weakest, activeReqFilters, type EstateSection, type Requirement,
+  sectionCounts, topicStats, weakest, activeReqFilters, parseBody, leadFirst, previewText, plainText, parseSourceItems, type EstateSection, type Requirement,
 } from './EstateShared'
 
 let n = 0
@@ -157,5 +157,92 @@ describe('source links: only real http and https addresses become links', () => 
     expect(out).toHaveLength(3)
     expect(out[1]).toEqual([{ text: 'https://x.example.org', href: 'https://x.example.org/' }])
     expect(parseSources('')).toEqual([])
+  })
+})
+
+const SAMPLE = [
+  '**In plain words**', 'The gateway reads **three** registers and never keeps the answers.', '',
+  '**Key facts**', '- Two owners have confirmed in writing', '- One owner has not replied', '',
+  '**What it means for DEXA**', 'We can start with the two confirmed sources.', '',
+  '**Not established**', '- Whether the third source allows read access',
+].join('\n')
+
+describe('parseBody: labelled blocks', () => {
+  it('splits on bold label lines and names each block', () => {
+    const b = parseBody(SAMPLE)
+    expect(b.map((x) => [x.label, x.kind])).toEqual([
+      ['In plain words', 'lead'], ['Key facts', 'facts'], ['What it means for DEXA', 'dexa'], ['Not established', 'unknown'],
+    ])
+    expect(b[0].text).toBe('The gateway reads **three** registers and never keeps the answers.')
+    expect(b[1].text).toBe('- Two owners have confirmed in writing\n- One owner has not replied')
+  })
+
+  it('accepts a colon on the label, in either place, and any letter case', () => {
+    expect(parseBody('**Key facts:**\n- a').map((x) => [x.label, x.kind])).toEqual([['Key facts', 'facts']])
+    expect(parseBody('**KEY FACTS**:\n- a')[0].kind).toBe('facts')
+  })
+
+  it('treats text before the first label as a plain block, and unknown labels as "other"', () => {
+    const b = parseBody('Some opening words.\n\n**Extra notes**\nMore.')
+    expect(b.map((x) => [x.label, x.kind, x.text])).toEqual([[null, 'plain', 'Some opening words.'], ['Extra notes', 'other', 'More.']])
+  })
+
+  it('does not treat bold in the middle of a line, or a bold line with more text, as a label', () => {
+    expect(parseBody('We use **TLS** here.\n**Note:** something')).toEqual([{ label: null, kind: 'plain', text: 'We use **TLS** here.\n**Note:** something' }])
+  })
+
+  it('copes with Windows line endings, empty text and a label with nothing under it', () => {
+    expect(parseBody('**Key facts**\r\n- a\r\n')[0].text).toBe('- a')
+    expect(parseBody('')).toEqual([])
+    expect(parseBody('**Not established**')).toEqual([{ label: 'Not established', kind: 'unknown', text: '' }])
+  })
+
+  it('puts "In plain words" first without changing the order of the rest', () => {
+    const b = parseBody('**Key facts**\n- a\n\n**In plain words**\nHello')
+    expect(leadFirst(b).map((x) => x.label)).toEqual(['In plain words', 'Key facts'])
+  })
+
+  it('never produces HTML: markup in the text stays text', () => {
+    const b = parseBody('**In plain words**\n<img src=x onerror=alert(1)> and <b>bold</b>')
+    expect(b[0].text).toBe('<img src=x onerror=alert(1)> and <b>bold</b>')
+  })
+})
+
+describe('previewText and plainText', () => {
+  it('previews the "In plain words" text with the formatting removed', () => {
+    expect(previewText(SAMPLE)).toBe('The gateway reads three registers and never keeps the answers.')
+  })
+  it('falls back to the first block with text, but not the "Not established" block first', () => {
+    expect(previewText('**Key facts**\n- one\n- two\n\n**Not established**\n- x')).toBe('one two')
+    expect(previewText('**Not established**\n- only this')).toBe('only this')
+    expect(previewText('')).toBe('')
+  })
+  it('cuts a long preview at a word and adds an ellipsis', () => {
+    const p = previewText('**In plain words**\n' + 'word '.repeat(100), 50)
+    expect(p.endsWith('…')).toBe(true)
+    expect(p.length).toBeLessThanOrEqual(51)
+  })
+  it('removes bold, italic, links and bullet dashes', () => {
+    expect(plainText('- **a** and *b* and [site](https://x.example.org)\n- c')).toBe('a and b and site c')
+  })
+})
+
+describe('parseSourceItems: a trailing note in brackets becomes a label', () => {
+  it('splits off the note and keeps the link', () => {
+    const [a] = parseSourceItems('Registry overview https://www.example.org/reg (search snippet only)')
+    expect(a.note).toBe('search snippet only')
+    expect(a.parts).toEqual([{ text: 'Registry overview ' }, { text: 'https://www.example.org/reg', href: 'https://www.example.org/reg' }])
+  })
+  it('gives no note for a line without one, or when the brackets hold a web address, or when the line is only the brackets', () => {
+    expect(parseSourceItems('Plain title')[0].note).toBeNull()
+    expect(parseSourceItems('See (https://www.example.org/x)')[0].note).toBeNull()
+    expect(parseSourceItems('(search snippet only)')[0].note).toBeNull()
+  })
+  it('keeps one item per non-blank line', () => {
+    expect(parseSourceItems('One (opened in full)\n\nTwo\r\nThree (not opened)').map((s) => s.note)).toEqual(['opened in full', null, 'not opened'])
+  })
+  it('does not take a bracket inside a web address as a note', () => {
+    const [a] = parseSourceItems('Spec https://www.example.org/a_(b)')
+    expect(a.note).toBeNull()
   })
 })
