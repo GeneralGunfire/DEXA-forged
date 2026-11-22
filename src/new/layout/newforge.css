@@ -100,3 +100,15 @@
 .nf input[type='search']::-webkit-search-cancel-button, .nf input[type='search']::-webkit-search-decoration { -webkit-appearance: none; display: none; }
 .nf input, .nf textarea, .nf select { color-scheme: dark; }
 
+
+/* printing a report: paper colours, no menu, no controls, the whole page flows across sheets */
+@media print {
+  @page { margin: 14mm; }
+  .nf { --background: #ffffff; --foreground: #111111; --card: #ffffff; --card-foreground: #111111; --secondary: #f3f4f6; --muted: #f3f4f6; --muted-foreground: #4b5563; --border: #d1d5db; --input: #d1d5db; --destructive: #b91c1c; --primary: #1d4ed8; }
+  html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
+  .nf { position: static !important; inset: auto !important; }
+  .nf, .nf [data-slot='sidebar-wrapper'], .nf [data-slot='sidebar-inset'] { display: block !important; height: auto !important; min-height: 0 !important; overflow: visible !important; background: #fff !important; color: #111 !important; }
+  .nf [data-slot='sidebar'], .nf [data-slot='sidebar-inset'] > header, .nf .nf-noprint { display: none !important; }
+  .nf .nf-printblock { break-inside: avoid; page-break-inside: avoid; }
+  .nf .nf-printpage { max-width: none !important; padding: 0 !important; }
+}

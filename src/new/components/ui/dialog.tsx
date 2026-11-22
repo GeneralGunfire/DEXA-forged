@@ -23,7 +23,7 @@ export function useEscape(onEscape: () => void, active = true) {
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 const visible = (el: HTMLElement) => el.offsetParent !== null || el === document.activeElement
 
-const SIZES = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-2xl' } as const
+const SIZES = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-2xl', xl: 'max-w-5xl' } as const
 
 /**
  * A popup. It sits above the page, keeps keyboard focus inside while open (Tab cycles), closes on Escape or a click

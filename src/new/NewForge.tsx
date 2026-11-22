@@ -15,7 +15,9 @@ const Settings = lazy(() => import('./pages/settings/Settings'))
 const Databases = lazy(() => import('./pages/databases/Databases'))
 const DbRecord = lazy(() => import('./pages/databases/Record'))
 const Estate = lazy(() => import('./pages/estate/EstateOverview'))
-const BUILT = ['/new/documentation/estate-overview', '/new/documentation/databases', '/new/admin/calendar', '/new/admin/announcements', '/new/admin/branding', '/new/admin/feedback', '/new/admin/settings']
+const Documents = lazy(() => import('./pages/documents/Documents'))
+const Reports = lazy(() => import('./pages/reports/Reports'))
+const BUILT = ['/new/documentation/documents', '/new/documentation/reports', '/new/documentation/estate-overview', '/new/documentation/databases', '/new/admin/calendar', '/new/admin/announcements', '/new/admin/branding', '/new/admin/feedback', '/new/admin/settings']
 
 export default function NewForge({ session }: { session: Session }) {
   const email = session.user.email ?? ''
@@ -31,6 +33,8 @@ export default function NewForge({ session }: { session: Session }) {
         <Route path="admin/feedback" element={<Suspense fallback={null}><Feedback /></Suspense>} />
         <Route path="admin/settings" element={<Suspense fallback={null}><Settings /></Suspense>} />
         <Route path="documentation/estate-overview" element={<Suspense fallback={null}><Estate /></Suspense>} />
+        <Route path="documentation/documents" element={<Suspense fallback={null}><Documents /></Suspense>} />
+        <Route path="documentation/reports" element={<Suspense fallback={null}><Reports /></Suspense>} />
         <Route path="documentation/databases" element={<Suspense fallback={null}><Databases /></Suspense>} />
         <Route path="documentation/databases/:id" element={<Suspense fallback={null}><DbRecord /></Suspense>} />
         {ALL_LEAVES.filter((l) => !BUILT.includes(l.to)).map((l) => (
