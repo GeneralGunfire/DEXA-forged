@@ -214,7 +214,7 @@ export function TimelineTab({ db, onlyPhase, onLoaded }: { db: Db; onlyPhase?: s
       {editing ? (
         <EntryForm
           key={editing.entry?.id ?? JSON.stringify(editing.preset ?? {})}
-          db={db} entry={editing.entry} preset={editing.preset} me={me} entries={all}
+          db={db} entry={editing.entry} preset={editing.preset} me={me} entries={all} lockPhase={onlyPhase}
           onClose={() => setEditing(null)} onDone={() => { setEditing(null); reload() }}
         />
       ) : null}
@@ -321,8 +321,8 @@ function History({ entryId }: { entryId: string }) {
 const PHASE_OPTIONS = [{ value: '1', label: 'Phase 1' }, { value: '1-2', label: 'Phases 1-2' }, { value: '2', label: 'Phase 2' }, { value: 'Other', label: 'Other' }]
 const MAIN = ['1', '1-2', '2']
 
-function EntryForm({ db, entry, preset, me, entries, onClose, onDone }: {
-  db: Db; entry?: Entry; preset?: Partial<Entry>; me: string; entries: Entry[]; onClose: () => void; onDone: () => void
+function EntryForm({ db, entry, preset, me, entries, lockPhase, onClose, onDone }: {
+  db: Db; entry?: Entry; preset?: Partial<Entry>; me: string; entries: Entry[]; lockPhase?: string; onClose: () => void; onDone: () => void
 }) {
   const start = entry ?? preset ?? {}
   const [type, setType] = useState<EntryType>((start.type as EntryType) ?? 'Note')
@@ -348,7 +348,7 @@ function EntryForm({ db, entry, preset, me, entries, onClose, onDone }: {
     if (busy) return
     if (!title.trim()) return setErr('Give the entry a one-line title.')
     if (!when) return setErr('Choose when this happened.')
-    const phase = phaseSel === 'Other' ? phaseOther.trim() : phaseSel
+    const phase = lockPhase ?? (phaseSel === 'Other' ? phaseOther.trim() : phaseSel)
     if (!phase) return setErr('Name the phase.')
     const red = checkRedaction({ title: title.trim(), summary: summary.trim(), detail: detail.trim() })
     if (!red.ok) return setErr(red.message)
@@ -394,8 +394,8 @@ function EntryForm({ db, entry, preset, me, entries, onClose, onDone }: {
           <div><label className={label} htmlFor="tl-author">Author</label><Select id="tl-author" value={author} onChange={setAuthor} options={AUTHORS.map((a) => ({ value: a as string, label: a }))} /></div>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <div><label className={label} htmlFor="tl-phase">Phase</label><Select id="tl-phase" value={phaseSel} onChange={setPhaseSel} options={PHASE_OPTIONS} /></div>
-          {phaseSel === 'Other' ? <div><label className={label} htmlFor="tl-phase2">Phase name</label><input id="tl-phase2" className={field} value={phaseOther} maxLength={40} onChange={(e) => setPhaseOther(e.target.value)} /></div> : null}
+          {lockPhase ? null : <div><label className={label} htmlFor="tl-phase">Phase</label><Select id="tl-phase" value={phaseSel} onChange={setPhaseSel} options={PHASE_OPTIONS} /></div>}
+          {!lockPhase && phaseSel === 'Other' ? <div><label className={label} htmlFor="tl-phase2">Phase name</label><input id="tl-phase2" className={field} value={phaseOther} maxLength={40} onChange={(e) => setPhaseOther(e.target.value)} /></div> : null}
           {type === 'Error' ? <div><label className={label} htmlFor="tl-status">Status</label><Select id="tl-status" value={status} onChange={(v) => setStatus(v as 'Open' | 'Resolved')} options={STATUSES.map((s) => ({ value: s as string, label: s }))} /></div> : null}
         </div>
         <div>

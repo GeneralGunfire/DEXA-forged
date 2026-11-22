@@ -1,6 +1,6 @@
 import {
   Bell, BookOpen, Briefcase, CalendarDays, Database, FileText, FolderOpen, Globe2, Image, LayoutGrid,
-  ListChecks, MessageSquareHeart, Settings, Sparkles, Waypoints, type LucideIcon,
+  ListChecks, MessageSquareHeart, Settings, Waypoints, type LucideIcon,
 } from 'lucide-react'
 
 export type NavLeaf = { label: string; to: string; icon: LucideIcon }
@@ -31,13 +31,10 @@ export const ALL_GROUPS: NavGroup[] = [
     items: [
       { label: 'Plan', to: '/new/work/plan', icon: ListChecks },
       { label: 'Progress', to: '/new/work/progress', icon: Waypoints },
-      { label: 'Query', to: '/new/work/query', icon: Sparkles },
     ],
   },
 ]
 
-/** The Work group stays routed (as "Coming soon") but is not shown in the menu until its pages are built. */
-const HIDDEN_GROUPS = ['work']
-export const GROUPS: NavGroup[] = ALL_GROUPS.filter((g) => !HIDDEN_GROUPS.includes(g.id))
+export const GROUPS: NavGroup[] = ALL_GROUPS
 
 export const ALL_LEAVES = ALL_GROUPS.flatMap((g) => g.items)
