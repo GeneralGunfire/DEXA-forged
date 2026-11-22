@@ -70,3 +70,8 @@ export function useCanEdit() {
   }, [])
   return !!id && team.some((t) => t.user_id === id)
 }
+
+/** The short note under a form that says what the database will refuse. */
+export const RefusalHint = () => (
+  <p className="text-xs leading-5 text-muted-foreground">The database refuses text that looks like patient data, contact details, passwords or credentials.</p>
+)
