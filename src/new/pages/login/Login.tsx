@@ -8,9 +8,10 @@ import { Orbs } from './Orbs'
 import '../../layout/newforge.css'
 
 // Sizes that must not depend on the style order of the old site's global CSS are set inline.
-const underline: CSSProperties = { background: 'transparent', borderStyle: 'solid', borderWidth: '0 0 1px', borderRadius: 0, boxShadow: 'none' }
+// The old site styles every input with near-black text, so the text colour is set inline here to win over it.
+const underline: CSSProperties = { background: 'transparent', borderStyle: 'solid', borderWidth: '0 0 1px', borderRadius: 0, boxShadow: 'none', color: 'var(--foreground)', caretColor: 'var(--foreground)' }
 const kicker = 'text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground'
-const input = 'block w-full border-border px-0 py-2 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-foreground'
+const input = 'lg-field block w-full border-border px-0 py-2 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-foreground'
 
 /** The sign-in page. New Forge palette and type, scoped to its own .nf wrapper so nothing leaks to other pages. */
 export default function Login() {
