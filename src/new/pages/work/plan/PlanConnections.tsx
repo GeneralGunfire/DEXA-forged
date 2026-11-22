@@ -21,15 +21,15 @@ export function PlanConnections({ dbId, options, reload }: { dbId: string; optio
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
-  /** At most one route is chosen: the current one is cleared first, then the new one is set. */
+  /** "Mark chosen" is one call to the database function, which clears any other chosen route and sets this one. */
   async function choose(o: ConnOption) {
     if (busy) return
     setBusy(o.id); setMsg(null)
     try {
-      if (!o.chosen) for (const c of options.filter((x) => x.chosen)) unwrap(await supabase.from('gw_connection_options').update({ chosen: false }).eq('id', c.id))
-      unwrap(await supabase.from('gw_connection_options').update({ chosen: !o.chosen }).eq('id', o.id))
+      if (o.chosen) unwrap(await supabase.from('gw_connection_options').update({ chosen: false }).eq('id', o.id))
+      else { const { error } = await supabase.rpc('gw_choose_connection', { p_id: o.id }); if (error) throw error }
       reload()
-    } catch (e) { setMsg(saveError(e)); reload() } finally { setBusy(null) }
+    } catch (e) { setMsg(saveError(e, false)); reload() } finally { setBusy(null) }
   }
 
   return (
