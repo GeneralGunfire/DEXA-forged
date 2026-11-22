@@ -111,6 +111,8 @@ input:focus-visible { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(11, 1
 .submit:hover { background: #20263a; }
 .submit:active { transform: translateY(1px); }
 .submit:disabled { opacity: .7; cursor: progress; }
+.submit--alt { margin-top: 10px; background: #fff; color: var(--ink); border: 1.5px solid #f28a2e; }
+.submit--alt:hover { background: #fff6ee; }
 
 .field__eye:focus-visible, .link:focus-visible, .submit:focus-visible, .check input:focus-visible {
   outline: 3px solid rgba(11, 13, 18, 0.35); outline-offset: 2px;

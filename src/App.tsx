@@ -3,10 +3,21 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import Landing from './pages/Landing'
-import Login from './pages/Login'
+import Login, { NEXT_KEY } from './pages/Login'
 
 // The private workspace code is only downloaded after a successful sign-in.
 const Workspace = lazy(() => import('./pages/app/Shell'))
+const NewForge = lazy(() => import('./new/NewForge'))
+
+/** After sign-in: /new if the person pressed "New Forge" on the login page, otherwise the old site as before. */
+function AfterLogin() {
+  const [to] = useState(() => {
+    const asked = new URLSearchParams(window.location.search).get('to') === 'new'
+    try { return asked || sessionStorage.getItem(NEXT_KEY) === 'new' ? '/new' : '/app' } catch { return asked ? '/new' : '/app' }
+  })
+  useEffect(() => { try { sessionStorage.removeItem(NEXT_KEY) } catch { /* storage blocked */ } }, [])
+  return <Navigate to={to} replace />
+}
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -27,7 +38,17 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing signedIn={!!session} />} />
-        <Route path="/login" element={session ? <Navigate to="/app" replace /> : <Login />} />
+        <Route path="/login" element={session ? <AfterLogin /> : <Login />} />
+        <Route path="/new/*" element={
+            session ? (
+              <Suspense fallback={null}>
+                <NewForge session={session} />
+              </Suspense>
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
         <Route path="/app/*" element={
             session ? (
               <Suspense fallback={null}>
