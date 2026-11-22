@@ -12,7 +12,9 @@ const Announcements = lazy(() => import('./pages/announcements/Announcements'))
 const Branding = lazy(() => import('./pages/branding/Branding'))
 const Feedback = lazy(() => import('./pages/feedback/Feedback'))
 const Settings = lazy(() => import('./pages/settings/Settings'))
-const BUILT = ['/new/admin/calendar', '/new/admin/announcements', '/new/admin/branding', '/new/admin/feedback', '/new/admin/settings']
+const Databases = lazy(() => import('./pages/databases/Databases'))
+const DbRecord = lazy(() => import('./pages/databases/Record'))
+const BUILT = ['/new/documentation/databases', '/new/admin/calendar', '/new/admin/announcements', '/new/admin/branding', '/new/admin/feedback', '/new/admin/settings']
 
 export default function NewForge({ session }: { session: Session }) {
   const email = session.user.email ?? ''
@@ -27,6 +29,8 @@ export default function NewForge({ session }: { session: Session }) {
         <Route path="admin/branding" element={<Suspense fallback={null}><Branding /></Suspense>} />
         <Route path="admin/feedback" element={<Suspense fallback={null}><Feedback /></Suspense>} />
         <Route path="admin/settings" element={<Suspense fallback={null}><Settings /></Suspense>} />
+        <Route path="documentation/databases" element={<Suspense fallback={null}><Databases /></Suspense>} />
+        <Route path="documentation/databases/:id" element={<Suspense fallback={null}><DbRecord /></Suspense>} />
         {ALL_LEAVES.filter((l) => !BUILT.includes(l.to)).map((l) => (
           <Route key={l.to} path={l.to.replace('/new/', '')} element={<ComingSoon />} />
         ))}

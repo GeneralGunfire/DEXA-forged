@@ -21,7 +21,9 @@ export default function NewLayout({ name }: { name: string }) {
   const navigate = useNavigate()
   const { isAdmin } = useRole()
   const profile = useProfile()
-  const activeGroup = GROUPS.find((g) => g.items.some((i) => i.to === pathname))?.id ?? null
+  // a record page such as /new/documentation/databases/<id> keeps its menu item selected
+  const onItem = (to: string) => pathname === to || pathname.startsWith(to + '/')
+  const activeGroup = GROUPS.find((g) => g.items.some((i) => onItem(i.to)))?.id ?? null
   const [openSection, setOpenSection] = useState<string | null>(activeGroup) // one group open at a time
   const [open, setOpen] = useState(() => { try { return localStorage.getItem(RAIL) !== '0' } catch { return true } })
 
@@ -32,7 +34,7 @@ export default function NewLayout({ name }: { name: string }) {
     setOpen(next)
     try { localStorage.setItem(RAIL, next ? '1' : '0') } catch { /* storage blocked */ }
   }
-  const title = pathname === '/new' ? 'Home' : ALL_LEAVES.find((l) => l.to === pathname)?.label ?? 'New Forge'
+  const title = pathname === '/new' ? 'Home' : ALL_LEAVES.find((l) => onItem(l.to))?.label ?? 'New Forge'
 
   return (
     <div className="nf" id="nf-root">
@@ -77,7 +79,7 @@ export default function NewLayout({ name }: { name: string }) {
                       <AnimatedSidebarMenuSub open={openSection === g.id}>
                         {g.items.map((i) => (
                           <AnimatedSidebarMenuSubItem key={i.to}>
-                            <AnimatedSidebarMenuSubButton isActive={pathname === i.to} onSelect={() => navigate(i.to)}>
+                            <AnimatedSidebarMenuSubButton isActive={onItem(i.to)} onSelect={() => navigate(i.to)}>
                               {i.label}
                             </AnimatedSidebarMenuSubButton>
                           </AnimatedSidebarMenuSubItem>
