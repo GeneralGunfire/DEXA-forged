@@ -10,6 +10,7 @@ import { DocumentsTab } from './DocumentsTab'
 import { TimelineTab } from './TimelineTab'
 import { TABS, type Db, type Tab } from './shared'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 export default function Record() {
   const { id = '' } = useParams()
@@ -44,7 +45,7 @@ export default function Record() {
       </div>
 
       {error ? <p className="mt-8 text-sm text-destructive" role="alert">Could not load this database: {error}</p>
-        : loading && !data ? <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
+        : loading && !data ? <Loading variant="detail" className="mt-8" />
         : data ? (
           <>
             <header className="mt-5 flex flex-wrap items-start justify-between gap-4">

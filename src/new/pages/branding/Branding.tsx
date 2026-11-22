@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { Dialog } from '@/components/ui/dialog'
 import { FileField } from '@/components/ui/file-field'
 import { Combobox } from '@/components/ui/combobox'
+import { Loading } from '@/components/ui/loading'
 
 const ACCEPT = '.png,.jpg,.jpeg,.mp4,.pdf'
 const LABELS = ['Logo', 'Image', 'App screenshot', 'Video', 'Document', 'Other']
@@ -80,7 +81,7 @@ export default function Branding() {
         {error ? (
           <p className="text-sm text-destructive" role="alert">Could not load the assets: {error}</p>
         ) : loading && !data ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <Loading variant="cards" />
         ) : all.length === 0 ? (
           <div className="border-t border-border py-16 text-center">
             <p className="text-lg font-medium">No brand assets yet.</p>

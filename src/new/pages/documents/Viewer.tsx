@@ -4,6 +4,7 @@ import { describe, downloadFile, fileKind, signedUrl } from '../../../lib/data'
 import { btn } from '../calendar/cal'
 import { Dialog } from '@/components/ui/dialog'
 import { Note } from '@/components/ui/note'
+import { InlineLoading } from '@/components/ui/loading'
 
 export type ViewDoc = { name: string; path: string; mime: string | null }
 export const ext = (path: string) => (path.split('.').pop() ?? '').toLowerCase()
@@ -38,7 +39,7 @@ function Img({ path, name }: { path: string; name: string }) {
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => { signedUrl(path).then(setUrl).catch((e) => setErr(describe(e))) }, [path])
   if (err) return <div className="p-6"><Note>{err}</Note></div>
-  return <div className="grid min-h-64 place-items-center p-4">{url ? <img src={url} alt={name} className="max-h-[70svh] w-auto rounded-md" /> : <p className="text-sm text-muted-foreground">Loading…</p>}</div>
+  return <div className="grid min-h-64 place-items-center p-4">{url ? <img src={url} alt={name} className="max-h-[70svh] w-auto rounded-md" /> : <InlineLoading />}</div>
 }
 
 function Pdf({ path }: { path: string }) {

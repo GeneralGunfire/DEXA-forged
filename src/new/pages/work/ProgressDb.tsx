@@ -8,6 +8,7 @@ import { ago, type Db, type Entry } from '../databases/shared'
 import { GatewayPrompts } from './GatewayPrompts'
 import { Empty, Part } from './FormDialog'
 import { summarise } from './shared'
+import { Loading } from '@/components/ui/loading'
 
 type Mini = { id: string; name: string }
 
@@ -35,7 +36,7 @@ export default function ProgressDb() {
       </div>
 
       {one.error ? <p className="mt-8 text-sm text-destructive" role="alert">Could not load this database: {one.error}</p>
-        : one.loading && !db ? <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
+        : one.loading && !db ? <Loading variant="detail" className="mt-8" />
         : db ? (
           <>
             <header className="mt-5">

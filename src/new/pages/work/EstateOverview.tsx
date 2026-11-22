@@ -9,6 +9,7 @@ import { EstateRequirements } from './estate/EstateRequirements'
 import { requirementStats, sectionCounts, STATUS_LABEL, REQ_STATUSES, type EstateSection, type Requirement } from './estate/EstateShared'
 import type { Db } from './shared'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 const TABS = ['Research', 'Requirements'] as const
 type Tab = (typeof TABS)[number]
@@ -61,7 +62,7 @@ export default function EstateOverview() {
       ) : error ? (
         <p className="mt-10 text-sm text-destructive" role="alert">Could not load the Estate page: {error}</p>
       ) : loading && !data ? (
-        <p className="mt-10 text-sm text-muted-foreground">Loading…</p>
+        <Loading variant="detail" className="mt-10" />
       ) : data ? (
         <>
           <div className="mt-8 grid gap-x-10 gap-y-6 border-t border-border pt-5 lg:grid-cols-[auto_auto_auto]">

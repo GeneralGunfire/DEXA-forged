@@ -6,6 +6,7 @@ import { unwrap, useLoad } from '../../../lib/data'
 import { btn } from '../calendar/cal'
 import { ago, TYPE_DOT, type Entry } from '../databases/shared'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 type Mini = { id: string; name: string; db_type: string }
 type Gw = { database_id: string | null; status: string }
@@ -77,7 +78,7 @@ export default function ProgressOverview() {
 
       <div className="mt-10 space-y-12">
         {error ? <p className="text-sm text-destructive" role="alert">Could not load progress: {error}</p>
-          : loading && !data ? <p className="text-sm text-muted-foreground">Loading…</p>
+          : loading && !data ? <Loading variant="rows" />
           : (
             <>
               {openErrors.length ? (

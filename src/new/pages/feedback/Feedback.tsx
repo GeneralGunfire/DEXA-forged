@@ -5,6 +5,7 @@ import { describe, fmtDate, unwrap, useLoad } from '../../../lib/data'
 import { btn, btnPrimary, field, label } from '../calendar/cal'
 import { cn } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
+import { Loading } from '@/components/ui/loading'
 
 // Everything in a feedback row came from outside (anonymous inserts are allowed), so it is shown as plain text only.
 export type Row = {
@@ -85,7 +86,7 @@ export default function Feedback() {
       {error ? (
         <p className="mt-10 text-sm text-destructive" role="alert">Could not load the feedback: {error}</p>
       ) : loading && !data ? (
-        <p className="mt-10 text-sm text-muted-foreground">Loading…</p>
+        <Loading variant="rows" className="mt-10" />
       ) : all.length === 0 ? (
         <div className="mt-10 border-t border-border py-20 text-center">
           <Inbox className="mx-auto size-8 text-muted-foreground" aria-hidden="true" />

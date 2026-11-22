@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { fmtDate, unwrap, useLoad } from '../../lib/data'
 import { addDays, dateTimeLabel, dayKey, shortDay, startOfWeek, todayKey, weekdayShort } from './calendar/cal'
 import { cn } from '@/lib/utils'
+import { InlineLoading } from '@/components/ui/loading'
 
 type Db = { id: string; name: string; status: string | null }
 type Entry = { id: string; database_id: string | null; type: string; status: string | null; title: string; author: string; happened_at: string }
@@ -99,7 +100,7 @@ const Quiet = ({ icon, title, note }: { icon: ReactNode; title: string; note: st
     </div>
   </div>
 )
-const Loading = () => <p className="text-xs text-muted-foreground">Loading…</p>
+const Loading = () => <InlineLoading className="text-xs" />
 
 const LINKS = [
   { to: '/new/admin/calendar', t: 'Calendar', d: 'Events and prompts', i: CalendarDays },

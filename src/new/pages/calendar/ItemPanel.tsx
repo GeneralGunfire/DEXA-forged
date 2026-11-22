@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Note } from '@/components/ui/note'
 import { TagPill } from './Views'
 import { cn } from '@/lib/utils'
+import { InlineLoading } from '@/components/ui/loading'
 
 const when = (e: Ev) => {
   if (e.all_day) return `${longDay(dayKey(e.starts_at))} (all day)`
@@ -218,7 +219,7 @@ export function ItemPanel({ ev, prompt, items, people, dbName, me, onClose, onCh
 
             <section className="mt-6 border-t border-border pt-6">
               <h3 className={label}>Responses{responses.data ? ` · ${responses.data.length}` : ''}</h3>
-              {responses.loading ? <p className="text-sm text-muted-foreground">Loading…</p>
+              {responses.loading ? <InlineLoading />
                 : responses.error ? <p className="text-sm text-destructive">Could not load the responses: {responses.error}</p>
                 : responses.data && responses.data.length ? (
                   <ol className="divide-y divide-border">

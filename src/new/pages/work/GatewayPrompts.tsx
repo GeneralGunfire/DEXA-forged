@@ -7,6 +7,7 @@ import { ItemPanel } from '../calendar/ItemPanel'
 import { TagPill } from '../calendar/Views'
 import { cn } from '@/lib/utils'
 import { Empty, Part } from './FormDialog'
+import { Loading } from '@/components/ui/loading'
 
 /**
  * The gateway prompts for one database. They are written by the Claude chat, so this only reads and shows them.
@@ -33,7 +34,7 @@ export function GatewayPrompts({ dbId, dbName }: { dbId: string; dbName: string 
       action={<button type="button" className={btn} onClick={reload} disabled={loading}><RefreshCw className={cn('size-4', loading && 'animate-spin')} aria-hidden="true" /> Refresh</button>}
     >
       {error ? <p className="text-sm text-destructive" role="alert">Could not load the prompts: {error}</p>
-        : loading && !data ? <p className="text-sm text-muted-foreground">Loading…</p>
+        : loading && !data ? <Loading variant="rows" rows={3} />
         : events.length === 0 ? <Empty>No gateway prompts for this database yet. The Claude chat adds them.</Empty>
         : (
           <ul className="divide-y divide-border border-y border-border">

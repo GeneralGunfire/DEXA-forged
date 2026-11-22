@@ -9,6 +9,7 @@ import { Note } from '@/components/ui/note'
 import { cn } from '@/lib/utils'
 import { InDepth } from './Sections'
 import { ago, LIMITS_TITLE, type Db } from './shared'
+import { Loading } from '@/components/ui/loading'
 
 const Sec = ({ title, aside, children, className }: { title: string; aside?: React.ReactNode; children: React.ReactNode; className?: string }) => (
   <section className={cn('border-t border-border pt-5', className)}>
@@ -55,7 +56,7 @@ export function OverviewTab({ db }: { db: Db }) {
   const [showAll, setShowAll] = useState(false)
 
   if (error) return <p className="text-sm text-destructive" role="alert">Could not load the overview: {error}</p>
-  if (loading && !data) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading && !data) return <Loading variant="detail" />
   if (!data) return null
   const c = completeness(db, data.log, data.docs)
   const limitsText = (data.limits?.detail?.trim() || data.limits?.summary?.trim() || '')

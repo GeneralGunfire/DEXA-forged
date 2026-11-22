@@ -6,6 +6,7 @@ import { unwrap, useLoad } from '../../../lib/data'
 import { btn } from '../calendar/cal'
 import { STAGE_LABEL, bar, buildOrder, pct, progress, type Db, type Decision, type Dep, type Stage } from './shared'
 import { cn } from '@/lib/utils'
+import { Loading } from '@/components/ui/loading'
 
 const COLS = 'md:grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_minmax(0,2fr)_6rem]'
 type Data = { dbs: Db[]; stages: Stage[]; decisions: Decision[]; deps: Dep[] }
@@ -56,7 +57,7 @@ export default function PlanOverview() {
 
       <div className="mt-10">
         {error ? <p className="text-sm text-destructive" role="alert">Could not load the plan: {error}</p>
-          : loading && !data ? <p className="text-sm text-muted-foreground">Loading…</p>
+          : loading && !data ? <Loading variant="rows" />
           : rows.length === 0 ? <p className="rounded-xl border border-dashed border-border px-6 py-14 text-center text-sm text-muted-foreground">No databases yet. Add them under Documentation first.</p>
           : (
             <>

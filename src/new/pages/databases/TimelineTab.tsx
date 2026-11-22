@@ -13,6 +13,7 @@ import { DateTimeField } from '@/components/ui/datetime-field'
 import { Note } from '@/components/ui/note'
 import { cn } from '@/lib/utils'
 import { ago, phaseName, TYPE_DOT, TYPE_ORDER, type Db, type Entry } from './shared'
+import { Loading } from '@/components/ui/loading'
 
 type Node = { entry: Entry; children: Node[] }
 type DocLink = { id: string; name: string; entry_id: string }
@@ -168,7 +169,7 @@ export function TimelineTab({ db, onlyPhase, onLoaded }: { db: Db; onlyPhase?: s
 
       <div className="mt-8">
         {entries.error ? <p className="text-sm text-destructive" role="alert">Could not load the timeline: {entries.error}</p>
-          : entries.loading && !entries.data ? <p className="text-sm text-muted-foreground">Loading…</p>
+          : entries.loading && !entries.data ? <Loading variant="rows" />
           : all.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
               <p className="text-lg font-medium">Nothing has been logged for this database yet.</p>
