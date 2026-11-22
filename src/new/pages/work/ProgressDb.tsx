@@ -7,6 +7,7 @@ import { TimelineTab } from '../databases/TimelineTab'
 import { ago, type Db, type Entry } from '../databases/shared'
 import { GatewayPrompts } from './GatewayPrompts'
 import { Empty, Part } from './FormDialog'
+import { summarise } from './shared'
 
 type Mini = { id: string; name: string }
 
@@ -54,19 +55,9 @@ export default function ProgressDb() {
   )
 }
 
-/**
- * What works and what did not, worked out from the entries themselves (type and status). Nothing here is stored.
- * Worked: fixes, and errors that are resolved. Did not: errors that are still open.
- */
+/** Shows what works and what did not (the rule lives in `summarise`). */
 function Summary({ entries }: { entries: Entry[] }) {
-  const { worked, failed, counts } = useMemo(() => {
-    const byNew = (a: Entry, b: Entry) => b.happened_at.localeCompare(a.happened_at)
-    return {
-      worked: entries.filter((e) => e.type === 'Fix' || (e.type === 'Error' && e.status === 'Resolved')).sort(byNew),
-      failed: entries.filter((e) => e.type === 'Error' && e.status !== 'Resolved').sort(byNew),
-      counts: entries.reduce<Record<string, number>>((a, e) => ({ ...a, [e.type]: (a[e.type] ?? 0) + 1 }), {}),
-    }
-  }, [entries])
+  const { worked, failed, counts } = useMemo(() => summarise(entries), [entries])
 
   const col = (title: string, rows: Entry[], bad: boolean, none: string) => (
     <div className="min-w-0">

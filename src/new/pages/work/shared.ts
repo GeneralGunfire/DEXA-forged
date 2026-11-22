@@ -1,5 +1,6 @@
 // Types and helpers for the Work section (gateway planning). Counts and plain descriptions only: never patient data.
 import { plainError } from '../calendar/cal'
+import type { Entry } from '../databases/shared'
 
 export type Db = { id: string; name: string; machine: string; db_type: string; status: string }
 
@@ -72,12 +73,45 @@ export function buildOrder(ids: string[], deps: Dep[]) {
   return { levels, circular: ids.filter((i) => !placed.has(i)) }
 }
 
-/** What a person should read when a save is refused. The typed text is never cleared. */
-export function saveError(e: unknown): string {
+/**
+ * What a person should read when a save is refused: the database's own message, with a short lead-in.
+ * `typed` is true for forms (their text is kept); pass false for button actions that have nothing typed.
+ */
+export function saveError(e: unknown, typed = true): string {
   const x = e as { message?: string; code?: string } | null
   const m = (x?.message ?? '').trim()
   if (x?.code === '42501' || /failed to fetch|network|not a team member|row-level security/i.test(m)) return plainError(e)
-  return `Not saved. ${m || 'The database gave no reason.'} What you typed is still here.`
+  return `Not saved. ${m || 'The database gave no reason.'}${typed ? ' What you typed is still here.' : ''}`
+}
+
+/**
+ * The position changes needed to move one stage up or down. Normally that is a swap with its neighbour (two updates,
+ * to be sent together). If the two share a position, every stage is renumbered 1, 2, 3… and only the ones that change
+ * are returned. Returns nothing when the stage is already at that end.
+ */
+export function reorder(stages: Pick<Stage, 'id' | 'position'>[], id: string, dir: 'up' | 'down'): { id: string; position: number }[] {
+  const list = [...stages].sort((a, b) => a.position - b.position)
+  const at = list.findIndex((x) => x.id === id)
+  const to = dir === 'up' ? at - 1 : at + 1
+  if (at < 0 || to < 0 || to >= list.length) return []
+  const a = list[at], b = list[to]
+  if (a.position !== b.position) return [{ id: a.id, position: b.position }, { id: b.id, position: a.position }]
+  const order = list.map((x) => x.id)
+  ;[order[at], order[to]] = [order[to], order[at]]
+  return order.map((oid, i) => ({ id: oid, position: i + 1 })).filter((u) => list.find((x) => x.id === u.id)!.position !== u.position)
+}
+
+/**
+ * What works and what did not, worked out from Phase 2 entries (type and status). Nothing here is stored.
+ * Worked: fixes, and errors that are resolved. Did not: errors that are still open. Both newest first.
+ */
+export function summarise(entries: Entry[]) {
+  const newest = (a: Entry, b: Entry) => b.happened_at.localeCompare(a.happened_at)
+  return {
+    worked: entries.filter((e) => e.type === 'Fix' || (e.type === 'Error' && e.status === 'Resolved')).sort(newest),
+    failed: entries.filter((e) => e.type === 'Error' && e.status !== 'Resolved').sort(newest),
+    counts: entries.reduce<Record<string, number>>((a, e) => ({ ...a, [e.type]: (a[e.type] ?? 0) + 1 }), {}),
+  }
 }
 
 export const pct = (done: number, total: number) => (total === 0 ? 0 : Math.round((done / total) * 100))
