@@ -4,10 +4,11 @@ import type { Entry } from '../databases/shared'
 
 export type Db = { id: string; name: string; machine: string; db_type: string; status: string }
 
-export const SECTION_KINDS = ['background', 'connection', 'gateway_fit', 'build_approach', 'how_it_works'] as const
+export const SECTION_KINDS = ['background', 'connection', 'gateway_fit', 'build_approach', 'how_it_works', 'legal'] as const
 export type SectionKind = (typeof SECTION_KINDS)[number]
 export const SECTION_LABEL: Record<SectionKind, string> = {
   background: 'Background', connection: 'Connection', gateway_fit: 'Gateway fit', build_approach: 'Build approach', how_it_works: 'How it works',
+  legal: 'Legal constraints and obligations',
 }
 export type PlanSection = { id: string; database_id: string; kind: SectionKind; title: string; body: string; position: number; updated_at: string }
 
