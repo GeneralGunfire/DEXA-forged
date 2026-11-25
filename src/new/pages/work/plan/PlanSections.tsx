@@ -6,36 +6,45 @@ import { btn, btnGhost, field, label } from '../../calendar/cal'
 import { ago } from '../../databases/shared'
 import { Select } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { Rich } from '../../../components/rich'
 import { Empty, FormDialog, Part } from '../FormDialog'
 import { SECTION_KINDS, SECTION_LABEL, type PlanSection, type SectionKind } from '../shared'
 
 export function PlanSections({ dbId, sections, reload }: { dbId: string; sections: PlanSection[]; reload: () => void }) {
   const [editing, setEditing] = useState<PlanSection | 'new' | null>(null)
-  const list = [...sections].sort((a, b) => a.position - b.position)
+  const all = [...sections].sort((a, b) => a.position - b.position)
+  const list = all.filter((s) => s.kind !== 'legal')
+  const legal = all.filter((s) => s.kind === 'legal')
   return (
     <Part
       id="sections" title="Sections" count={list.length} hint="In-depth notes on this database. Both of us and the Claude chat write here."
       action={<button type="button" className={btn} onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden="true" /> Add section</button>}
     >
-      {list.length === 0 ? <Empty>No sections yet. Add the background, the connection route or the build approach.</Empty> : (
-        <ul className="space-y-4">
-          {list.map((s) => (
-            <li key={s.id} className="rounded-xl border border-border px-5 py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="rounded-full border border-border px-2 text-[11px] font-medium leading-5 text-muted-foreground">{SECTION_LABEL[s.kind] ?? s.kind}</span>
-                  <h3 className="mt-2 break-words text-base font-semibold tracking-tight">{s.title}</h3>
-                </div>
-                <button type="button" className={cn(btnGhost, '!h-8 !px-2.5')} onClick={() => setEditing(s)}><Pencil className="size-3.5" aria-hidden="true" /> Edit</button>
-              </div>
-              {s.body ? <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-6 text-foreground/90">{s.body}</p> : null}
-              <p className="mt-3 text-[11px] text-muted-foreground">Updated {ago(s.updated_at)}</p>
-            </li>
-          ))}
-        </ul>
+      {list.length === 0 ? <Empty>No sections yet. Add one with the Add section button.</Empty> : (
+        <ul className="space-y-4">{list.map((s) => <SectionCard key={s.id} s={s} onEdit={() => setEditing(s)} />)}</ul>
       )}
+      <div className="mt-6" id="legal">
+        <h3 className="mb-3 text-sm font-semibold tracking-tight">{SECTION_LABEL.legal}</h3>
+        {legal.length === 0 ? <Empty>Not yet researched</Empty> : <ul className="space-y-4">{legal.map((s) => <SectionCard key={s.id} s={s} onEdit={() => setEditing(s)} />)}</ul>}
+      </div>
       {editing ? <SectionForm dbId={dbId} section={editing === 'new' ? null : editing} next={Math.max(0, ...list.map((s) => s.position)) + 1} onClose={() => setEditing(null)} onDone={() => { setEditing(null); reload() }} /> : null}
     </Part>
+  )
+}
+
+function SectionCard({ s, onEdit }: { s: PlanSection; onEdit: () => void }) {
+  return (
+    <li className="rounded-xl border border-border px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="rounded-full border border-border px-2 text-[11px] font-medium leading-5 text-muted-foreground">{SECTION_LABEL[s.kind] ?? s.kind}</span>
+          <h3 className="mt-2 break-words text-base font-semibold tracking-tight">{s.title}</h3>
+        </div>
+        <button type="button" className={cn(btnGhost, '!h-8 !px-2.5')} onClick={onEdit}><Pencil className="size-3.5" aria-hidden="true" /> Edit</button>
+      </div>
+      {s.body ? <Rich text={s.body} className="mt-2 max-w-[72ch] break-words !text-sm !leading-6 [&_p]:text-foreground/90" /> : null}
+      <p className="mt-3 text-[11px] text-muted-foreground">Updated {ago(s.updated_at)}</p>
+    </li>
   )
 }
 
